@@ -135,7 +135,7 @@ Off by default. In **Settings → Profile lock**, pick the agents to lock and se
 | Folder and file contents, memory (SOUL.md, MEMORY.md, USER.md, context files) | refused (HTTP 423); the Folder and Memory tabs ask for the PIN |
 | Kanban tasks assigned to it | the card stays, titled *🔒 Private task*; its details ask for the PIN |
 | Its cron jobs | the schedule stays, named *🔒 Private job* |
-| Live activity and current task in the office | generic (*🔒 Working*, *On a break*) |
+| Live activity, current task and the provenance of its state in the office | generic (*🔒 Working*, *On a break*, *🔒 Private*) |
 | Sessions, logs and the latest session (these come from the `default` profile) | hidden when `default` is locked |
 | Token usage | totals stay; its biggest session is hidden |
 
@@ -237,6 +237,7 @@ Each agent resolves to its own folder:
 The Hermes root follows Hermes's own rules (`HERMES_HOME`, default `~/.hermes`); `RUANG_HERMES_ROOT` overrides it.
 - A non-default agent that resolves to the Hermes root, or to a folder another agent already owns, is shown as unavailable with the reason instead of being opened.
 - When one agent's folder contains another's (the stock root holds `profiles/`), that sub-folder is hidden and cannot be read through the outer agent.
+- The Hermes `profiles/` folder is always hidden from an agent whose folder contains it (the stock `default`), even while `hermes profile list` cannot be read and the other agents are unknown, so no profile, locked or not, can be read through the root.
 - Cards and the breadcrumb show the real path.
 
 `/api/folders` lists the agents; `/api/folders/<agent>/list?path=` and `/api/folders/<agent>/file?path=` browse one folder. The safety rules:
