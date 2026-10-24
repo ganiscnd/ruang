@@ -48,7 +48,7 @@ npm test             # vitest; tests use fake command runners, never the real he
 
 ## Always-on instance (launchd)
 
-Ruang runs 24/7 as the LaunchAgent `com.ganiscnd.ruang` (same pattern as Hermes' own
+Ruang runs whenever the Mac is on (see the power schedule below) as the LaunchAgent `com.ganiscnd.ruang` (same pattern as Hermes' own
 `ai.hermes.dashboard`): `node bin/ruang.js --port 3001` from `~/projects/ruang`, using the
 production build (`dist/` + `build/server/`), with `RunAtLoad` and `KeepAlive` (restarted by
 launchd after a crash, 20 s throttle). `PATH` includes `~/.local/bin` so `hermes` is found. Logs:
@@ -63,8 +63,15 @@ launchd after a crash, 20 s throttle). `PATH` includes `~/.local/bin` so `hermes
 Stop or start by hand: `launchctl bootout gui/$(id -u)/com.ganiscnd.ruang` /
 `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ganiscnd.ruang.plist`.
 
-Remote access over Tailscale (tailnet only, never `tailscale funnel`): `tailscale serve` proxies
-HTTPS on the Mac's MagicDNS name to 127.0.0.1:3001. See `docs/reports/02-phase2.md`.
+Remote access over Tailscale (tailnet only, never `tailscale funnel`): `tailscale serve --bg
+--https=443 http://127.0.0.1:3001` proxies **https://abiyudhas-mac-mini.tail5349c4.ts.net/** to
+the service. Check with `tailscale serve status`; undo with `tailscale serve --https=443 off`.
+
+**Power schedule: the Mac is not on 24/7.** It runs on a scheduled smart plug: it boots when the
+plug turns on (`autorestartatconnect 1`) and shuts down cleanly every day at 10:55 PM
+(`pmset repeat`), a few minutes before the plug turns off. Never change power settings. Cron jobs
+due while the Mac is off are missed and show as **overdue**. That is correct, real data: do not
+hide, smooth over, or "fix" it.
 
 ## Architecture map
 

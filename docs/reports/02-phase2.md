@@ -42,56 +42,58 @@ file for stdout and stderr. Ruang's job copies that pattern.
 - `scripts/deploy.sh` rebuilt and restarted it, healthy (runs → 3).
 - Dev/test rule in `CLAUDE.md`: test servers use port 3002, never 3001.
 
-## Tailscale HTTPS (not run yet: needs your OK)
+## Tailscale HTTPS (done, 2026-10-24)
 
-Findings:
-
-- CLI: `/usr/local/bin/tailscale` (a wrapper for `/Applications/Tailscale.app`), version 1.104.2,
-  standalone app with its network extension active. Logged in to tailnet `ganiscnd@gmail.com`.
-- This Mac: `abiyudhas-mac-mini`, tailnet IP 100.69.40.1.
-- **MagicDNS: enabled** (suffix `tail5349c4.ts.net`).
-- **HTTPS certificates: NOT enabled** (`CertDomains` is empty).
-- No serve or funnel configuration exists. The node has no Funnel permission.
-
-What you need to do first: in the Tailscale admin console → **DNS** → **HTTPS Certificates** →
-**Enable HTTPS**. Note: certificate names are published in public Certificate Transparency logs,
-so the name `abiyudhas-mac-mini.tail5349c4.ts.net` becomes publicly *visible*. It still cannot
-be *reached* from outside your tailnet.
-
-The command I want to run (after you enable HTTPS and say OK):
+Before: MagicDNS on (`tail5349c4.ts.net`), HTTPS certificates off, no serve/funnel config. The
+owner enabled HTTPS certificates in the admin console (`CertDomains` now lists
+`abiyudhas-mac-mini.tail5349c4.ts.net`). Then, with the owner's OK:
 
 ```sh
 tailscale serve --bg --https=443 http://127.0.0.1:3001
 ```
 
-- URL you will get: **https://abiyudhas-mac-mini.tail5349c4.ts.net/**
-- `serve` (not `funnel`) is tailnet-only: only devices logged in to your tailnet can open it.
-  Ruang itself keeps listening on 127.0.0.1; Tailscale forwards to it locally.
-- `--bg` keeps the setting across reboots and Tailscale restarts.
-- Afterwards I would check: `tailscale serve status`, `tailscale funnel status` (must show no
-  Funnel), and `curl https://abiyudhas-mac-mini.tail5349c4.ts.net/api/health`.
-- Undo: `tailscale serve --https=443 off`.
+- URL: **https://abiyudhas-mac-mini.tail5349c4.ts.net/**
+- `tailscale serve status` → `https://abiyudhas-mac-mini.tail5349c4.ts.net (tailnet only)`,
+  `/ proxy http://127.0.0.1:3001`. `tailscale funnel status` shows the same "tailnet only" entry:
+  no Funnel, not public.
+- `curl https://abiyudhas-mac-mini.tail5349c4.ts.net/api/health` from this Mac → HTTP 200,
+  certificate valid, `{"ok":true,"apiVersion":12,…}`. The very first request timed out while
+  Tailscale fetched the certificate; every request after it answered in about 20 ms.
+- Ruang still listens on 127.0.0.1:3001 only (checked with `lsof`); Tailscale forwards to it.
+- `--bg` keeps the setting across reboots. Undo: `tailscale serve --https=443 off`.
+- Certificate names are published in public Certificate Transparency logs: the name is publicly
+  visible, but the service is reachable only from the tailnet.
+- Still recommended: switch on the Ruang access code (Settings). It is required for write
+  actions anyway (decision 4).
+- Side note: Hermes' own dashboard listens on the tailnet IP directly (`100.69.40.1:9119`, plain
+  HTTP).
 
-Recommendation: switch on the Ruang access code (Settings) before or right after this. Anyone on
-any device in your tailnet could otherwise open Ruang, and decision 4 needs it for write actions
-anyway.
+## Power schedule (owner's setup, 2026-10-24)
 
-Side note: Hermes' own dashboard listens on the tailnet IP directly (`100.69.40.1:9119`, plain
-HTTP), so it is already reachable from your tailnet devices without HTTPS.
+The Mac mini is **not on 24/7**. It is powered by a scheduled smart plug:
 
-## Coming back after a power cut or reboot
+- It boots by itself when the plug turns on (`autorestartatconnect 1`). `autorestart 0` (start
+  after a power *failure*) does not matter for this setup.
+- `pmset -g sched` → `shutdown at 10:55PM every day`: a clean shutdown a few minutes before the
+  plug turns off.
+- After boot: automatic login (`kimi`), then launchd starts Hermes and Ruang, and Tailscale starts
+  with its app (check that "Launch at login" is on in Tailscale's settings).
+- **Cron jobs due while the Mac is off are missed and show as overdue in Ruang. That is correct,
+  real data**, not a bug.
+- Power settings are owned by the owner: never change them.
+
+## Earlier power check (before the owner explained the smart plug)
 
 | Check | Current | Needed | What to do |
 |---|---|---|---|
 | Automatic login | **On** (user `kimi`; FileVault is off, which auto-login requires) | On | Nothing |
 | Sleep | `sleep 0` (never) | Never | Nothing |
-| Start after power failure | **`autorestart 0` (off)** | On | System Settings → Energy → turn on "Start up automatically after a power failure", or `sudo pmset -a autorestart 1` |
+| Start after power failure | `autorestart 0` (off) | Not needed (smart plug + `autorestartatconnect 1`) | Nothing; do not change power settings |
 | Other | `autorestartatconnect 1`, `womp 1` (wake for network), `powernap 1`, `displaysleep 10`, `disksleep 10` | n/a | Nothing |
 | Tailscale starts at login | Could not verify from the terminal | On | Tailscale menu-bar icon → Settings → make sure "Launch at login" is on |
 
 After a reboot: macOS logs in `kimi` automatically, then launchd starts Hermes (gateway, dashboard)
-and Ruang. Tailscale starts with its app. Only the Mac's power-on after a power cut is not ensured
-yet (`autorestart`).
+and Ruang. Tailscale starts with its app. Power-on is handled by the smart plug (see above).
 
 Security trade-off to be aware of: auto-login with FileVault off means anyone with physical
 access to the Mac mini gets your logged-in session. That is a common choice for a home server,
