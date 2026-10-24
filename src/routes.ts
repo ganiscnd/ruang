@@ -1,4 +1,5 @@
-export const navigation = ['Office', 'Agents', 'Usage', 'Task Board', 'Calendar', 'Activity', 'Memory', 'Folders', 'Logs', 'Settings'] as const
+// custom: 'Pipeline' (src/custom/pages/Pipeline.tsx) is the freelance lead pipeline.
+export const navigation = ['Office', 'Pipeline', 'Agents', 'Usage', 'Task Board', 'Calendar', 'Activity', 'Memory', 'Folders', 'Logs', 'Settings'] as const
 export type Page = typeof navigation[number]
 
 /** The page shown when the address names no page (or an unknown one). */
