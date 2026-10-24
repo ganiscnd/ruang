@@ -128,3 +128,49 @@ by a Kanban task → Kanban task (`running` → Working, `review` → Reviewing)
 (Collaborating) → Idle only when every source is fresh, otherwise Unknown. `roomForState` maps:
 Idle → Lounge; Working → assigned desk; Reviewing → review desk; Collaborating → meeting room;
 Unknown → neutral presence. Each station carries `provenance` and `freshness` strings explaining why.
+
+## Custom features (this fork)
+
+Plans and protocol: `docs/CUSTOM_ROADMAP.md` (decisions), `docs/plans/feature1-pipeline.md`,
+`docs/LEADS_PROTOCOL.md` (give this to Hermes agents). Reports: `docs/reports/`.
+
+### Feature 1: Lead & Proposal Pipeline (`#/pipeline`)
+
+| File | What it does |
+| --- | --- |
+| `server/custom/lead-format.ts` | The `[lead]` body block and `stage: <Stage>` comments: parse, write, stage history (newest counting stage wins; owner-only stages by agents ignored). |
+| `server/custom/pipeline.ts` | Read-only collector for board `leads`: `boards list`, `--board leads list --json`, `show --json` per lead (max 100, 4 at a time). |
+| `server/custom/validate.ts` | Validation of browser input for writes (types, lengths, no control characters, no unknown keys). |
+| `server/custom/actions.ts` | **The write allowlist**: `board.setup`, `lead.create`, `lead.stage`, `lead.note`, `lead.assign`, each a fixed argv. Preview → single-use token → execute; rate limits; `write-audit.jsonl` in Ruang's config folder. |
+| `server/custom/routes.ts` | `GET /api/custom/pipeline[/:id]`, `POST /api/custom/actions/{preview,execute}`; same-origin and access-code guards; profile-lock redaction. |
+| `src/custom/pages/Pipeline.tsx`, `LeadDetail.tsx`, `LeadActions.tsx`, `ActionDialogs.tsx`, `use-write-action.tsx`, `write-actions.ts`, `lead-view.ts`, `types.ts`, `pipeline.css` | The page, detail dialog, action forms, confirmation dialog and display helpers. |
+
+Upstream hooks (marked `custom:`): `server/index.ts` (`installCustom`, `accessOf`),
+`server/access.ts` (`installAccess` returns `accessOf`), `server/mission-control.ts` (exports,
+`write` audit option, `clearTaskBoardCache`), `src/routes.ts` (menu), `src/App.tsx` (page, sidebar
+label), `src/pages/Logs.tsx` + `src/types.ts` (WRITE chip), `api-version.ts` (13).
+
+Write rules (never weaken):
+- Writes need the access code **enabled and unlocked**; otherwise buttons are disabled with the reason.
+- Board pinned (`--board=leads`); options only as `--opt=value`; free text always after `--`.
+- Lead cards are never assigned, blocked, triaged or put in review by Ruang. Agents work on
+  separate work cards `[lead <id>] Research: …` / `Draft proposal: …`, linked with
+  `link <work> <lead>` (work = parent). While a work card is open the lead sits in `todo` and cannot
+  be closed (Hermes refuses `complete` while a parent is open).
+- Won/Lost = `stage:` comment, then `complete --result=<Won|Lost>`. Final.
+- `kanban.auto_decompose` is off in both profiles (set 2026-10-24); keep it off.
+- New write actions go into `actions.ts` only, with tests of their exact argv.
+
+### Testing writes safely
+
+Use port 3002 and an isolated config folder with a throwaway access code, so the real
+`~/.config/ruang/access.json` is never read or changed:
+
+```sh
+RUANG_CONFIG_DIR=$(mktemp -d) RUANG_PORT=3002 node bin/ruang.js
+curl -c jar -H 'content-type: application/json' -H 'x-ruang-request: 1' \
+  -d '{"code":"a-temporary-test-code"}' http://127.0.0.1:3002/api/access/code
+```
+
+Unit tests never run the real `hermes` (fake runners only). Real writes on the live Hermes need the
+owner's OK first.
