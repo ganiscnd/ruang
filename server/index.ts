@@ -30,7 +30,8 @@ const startedAt = new Date().toISOString()
 app.get('/api/health', (_request, response) => { response.json({ ok: true, apiVersion: API_VERSION, startedAt }) })
 
 // Optional access code (off by default): locks every other /api route until it is entered.
-installAccess(app)
+// custom: the access-code state is also what write actions check (server/custom/routes.ts).
+const accessOf = installAccess(app)
 // Optional profile lock (off by default): a PIN withholds the private data of chosen agents.
 const privacyOf = installProfileLock(app)
 
@@ -114,7 +115,7 @@ app.get('/api/folders/:profile/file', folderRoute(async (request) => {
 }))
 
 // custom: freelance Mission Control routes (server/custom).
-installCustom(app, privacyOf, async () => ({ enabled: false, reason: 'Write actions are not available yet.' }))
+installCustom(app, { privacyOf, accessOf })
 
 app.use('/api', (_request, response) => { response.status(404).json({ error: 'Not found' }) })
 

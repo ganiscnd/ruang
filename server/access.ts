@@ -162,8 +162,11 @@ function setSession(request: Request, response: Response, token: string | undefi
 
 export interface AccessStatus { enabled: boolean; unlocked: boolean; since?: string; minLength: number; rememberDays: number }
 
+/** custom: what write actions need to know about the access code for one request. */
+export interface AccessOfRequest { enabled: boolean; unlocked: boolean; /** The signed session cookie, when there is one. */ session?: string }
+
 /** Adds the access routes and the lock in front of every other /api route. Call before them. */
-export function installAccess(app: Express, store = new AccessStore(), throttle = new Throttle()): void {
+export function installAccess(app: Express, store = new AccessStore(), throttle = new Throttle()): (request: Request) => Promise<AccessOfRequest> {
   const unlocked = async (request: Request): Promise<boolean> => {
     const state = await store.state()
     return !state.enabled || (state.file !== undefined && tokenValid(state.file, cookieValue(request, COOKIE)))
@@ -237,4 +240,9 @@ export function installAccess(app: Express, store = new AccessStore(), throttle 
     if (await unlocked(request)) { next(); return }
     response.status(401).json({ error: 'Ruang is locked. Enter the access code.', locked: true })
   })
+  // custom: write actions (server/custom) require the access code to be on and unlocked.
+  return async (request: Request): Promise<AccessOfRequest> => {
+    const session = cookieValue(request, COOKIE)
+    return { enabled: (await store.state()).enabled, unlocked: await unlocked(request), ...(session ? { session } : {}) }
+  }
 }

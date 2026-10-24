@@ -94,7 +94,7 @@ export interface UsageSnapshot {
   fetchedAt: string
 }
 export interface CountSource { availability: Availability; total: number }
-export interface CommandLogEntry { command: string; ok: boolean; durationMs: number; at: string; error?: string }
+export interface CommandLogEntry { command: string; ok: boolean; durationMs: number; at: string; error?: string; /** custom: a write action (server/custom/actions.ts). */ write?: boolean }
 export interface CommandHealth { total: number; failed: number; averageMs: number }
 export interface CommandLogSnapshot { entries: CommandLogEntry[]; health: CommandHealth; fetchedAt: string }
 export interface DashboardSnapshot {
@@ -118,6 +118,7 @@ type Run = (file: string, args: string[], options?: RunOptions) => Promise<strin
 export interface RunOptions {
   /** stdout of a non-zero exit that is an expected empty state, not a failure. */ benign?: RegExp
   /** The program is optional (OpenCode): not being installed is an expected state, not a failure. */ optional?: boolean
+  /** custom: a write action; `display` is what the audit log shows instead of the raw argv. */ write?: { display: string; timeoutMs: number }
 }
 
 /** Error thrown by the command runner. Carries stdout so a caller can recognise a benign non-zero exit. */
@@ -457,20 +458,21 @@ function describeFailure(error: unknown): CommandError {
 
 export async function systemRun(file: string, args: string[], options: RunOptions = {}): Promise<string> {
   const started = Date.now()
-  const command = [file, ...args].join(' ')
+  const command = options.write?.display ?? [file, ...args].join(' ')
+  const write = options.write ? { write: true } : {}
   try {
     const { stdout } = await execFile(file, args, {
-      timeout: COMMAND_TIMEOUT_MS,
+      timeout: options.write?.timeoutMs ?? COMMAND_TIMEOUT_MS,
       maxBuffer: 16 * 1024 * 1024,
       env: { ...process.env, NO_COLOR: '1', TERM: 'dumb', COLUMNS: '200', PYTHONIOENCODING: 'utf-8' },
     })
-    recordCommand({ command, ok: true, durationMs: Date.now() - started, at: new Date(started).toISOString() })
+    recordCommand({ command, ok: true, durationMs: Date.now() - started, at: new Date(started).toISOString(), ...write })
     return stdout
   } catch (error) {
     const failure = describeFailure(error)
     const missing = (error as { code?: unknown } | null)?.code === 'ENOENT'
     const benign = (options.benign?.test(failure.stdout) ?? false) || (options.optional === true && missing)
-    recordCommand({ command, ok: benign, durationMs: Date.now() - started, at: new Date(started).toISOString(), ...(benign ? {} : { error: failure.message }) })
+    recordCommand({ command, ok: benign, durationMs: Date.now() - started, at: new Date(started).toISOString(), ...(benign ? {} : { error: failure.message }), ...write })
     throw failure
   }
 }
@@ -1022,6 +1024,8 @@ const agentActivitySource = cachedSource(async () => {
 export function getSnapshot(now = Date.now()): Promise<RuntimeSnapshot> { return runtimeSource(now) }
 export function clearSnapshotCache(): void { runtimeSource.clear() }
 export function getTaskBoard(now = Date.now()): Promise<TaskBoardSnapshot> { return taskBoardSource(now) }
+/** custom: after a write action, so the Task Board shows it at once. */
+export function clearTaskBoardCache(): void { taskBoardSource.clear() }
 export function getCalendar(now = Date.now()): Promise<CalendarSnapshot> { return calendarSource(now) }
 export function getActivity(now = Date.now()): Promise<ActivitySnapshot> { return activitySource(now) }
 export function getKnowledge(now = Date.now()): Promise<KnowledgeSnapshot> { return knowledgeSource(now) }

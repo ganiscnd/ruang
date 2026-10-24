@@ -96,13 +96,13 @@ describe('pipeline routes', () => {
   it('serves the list without comments, a detail, 400 for bad ids and 404 for unknown leads', async () => {
     const app = express()
     const { run } = fakeRun()
-    installCustom(app, async () => ({ hidden: new Set(), locked: new Set(), all: false }), async () => ({ enabled: false, reason: 'Off.' }), () => collectPipeline(run, NOW))
+    installCustom(app, { privacyOf: async () => ({ hidden: new Set(), locked: new Set(), all: false }), accessOf: async () => ({ enabled: false, unlocked: true }), source: () => collectPipeline(run, NOW), profiles: async () => [] })
     const server = app.listen(0, '127.0.0.1')
     await new Promise((resolve) => server.once('listening', resolve))
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
     try {
       const list = await (await fetch(`${base}/api/custom/pipeline`)).json() as { writes: unknown; leads: { id: string }[] }
-      expect(list).toHaveProperty('writes', { enabled: false, reason: 'Off.' })
+      expect(list).toHaveProperty('writes', { enabled: false, reason: 'Write actions need the access code. Turn it on in Settings.' })
       expect(list.leads.map((lead) => lead.id)).toEqual(['t_lead2', 't_lead1'])
       expect(((await (await fetch(`${base}/api/custom/pipeline/t_lead1`)).json()) as { lead: { stageHistory: unknown[] } }).lead.stageHistory).toHaveLength(2)
       for (const lead of list.leads) { expect(lead).not.toHaveProperty('comments'); expect(lead).not.toHaveProperty('stageHistory') }
