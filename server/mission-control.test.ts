@@ -6,6 +6,9 @@ import {
   collectSnapshot,
   collectTaskBoard,
   buildOfficeSnapshot,
+  clearCommandLog,
+  getCommandLog,
+  systemRun,
   buildOfficeSummary,
   parseChannelStatus,
   parseGatewayStatus,
@@ -89,6 +92,23 @@ describe('Hermes MVP source normalizers', () => {
   it('keeps Hermes no-jobs output available so the UI can show No scheduled jobs', async () => {
     const calendar = await collectCalendar(async () => "No scheduled jobs.\nCreate one with 'hermes cron create ...' or the /cron command in chat.\n")
     expect(calendar.jobs).toEqual({ availability: 'available', data: [] })
+  })
+
+  it('keeps the per-profile no-jobs output of Hermes v0.22+ available', async () => {
+    const calendar = await collectCalendar(async (_file, args) => args.join(' ') === 'profile list'
+      ? ' Profile          Model                        Gateway      Alias        Distribution\n ────────\n ◆default         claude-haiku-5-5             running      —            —\n  leadengineer    claude-haiku-5-5             running      leadengineer —\n'
+      : `No scheduled jobs in profile '${args[1]}'.\nCreate one with 'hermes cron create ...' or the /cron command in chat.\n`)
+    expect(calendar).toMatchObject({ jobs: { availability: 'available', data: [] } })
+    expect(calendar.failedProfiles).toBeUndefined()
+  })
+
+  it('records a missing optional program as an expected state, not a failed read', async () => {
+    clearCommandLog()
+    await expect(systemRun('ruang-test-program-that-does-not-exist', ['--version'], { optional: true })).rejects.toThrow('Command not installed or not on PATH.')
+    await expect(systemRun('ruang-test-program-that-does-not-exist', ['--version'])).rejects.toThrow('Command not installed or not on PATH.')
+    expect(getCommandLog().entries.map((entry) => entry.ok)).toEqual([false, true])
+    expect(getCommandLog().health.failed).toBe(1)
+    clearCommandLog()
   })
 
   it('treats malformed or unrecognized source output as unavailable', async () => {

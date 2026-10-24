@@ -114,7 +114,10 @@ export interface LogFile { name: string; label: string; source: Source<LogLine[]
 export interface LogsSnapshot { files: LogFile[]; fetchedAt: string }
 
 type Run = (file: string, args: string[], options?: RunOptions) => Promise<string>
-interface RunOptions { /** stdout of a non-zero exit that is an expected empty state, not a failure. */ benign?: RegExp }
+interface RunOptions {
+  /** stdout of a non-zero exit that is an expected empty state, not a failure. */ benign?: RegExp
+  /** The program is optional (OpenCode): not being installed is an expected state, not a failure. */ optional?: boolean
+}
 
 /** Error thrown by the command runner. Carries stdout so a caller can recognise a benign non-zero exit. */
 export class CommandError extends Error {
@@ -241,7 +244,8 @@ const CRON_FIELD = /^\s{2,}(Name|Schedule|Repeat|Next run|Overdue|Last run):\s*(
 
 export function parseCronJobs(output: string): ScheduledJob[] {
   const clean = stripAnsi(output)
-  if (/^\s*No scheduled jobs\./im.test(clean)) return []
+  // "No scheduled jobs." (older Hermes) or "No scheduled jobs in profile 'name'." (v0.22+).
+  if (/^\s*No scheduled jobs(?: in profile '[^'\n]*')?\./im.test(clean)) return []
   const jobs: ScheduledJob[] = []
   let current: (Partial<ScheduledJob> & { id: string; status: string }) | undefined
   const flush = () => {
@@ -450,7 +454,7 @@ function describeFailure(error: unknown): CommandError {
   return new CommandError('Read command was unavailable.', 'COMMAND_FAILED', stdout)
 }
 
-async function systemRun(file: string, args: string[], options: RunOptions = {}): Promise<string> {
+export async function systemRun(file: string, args: string[], options: RunOptions = {}): Promise<string> {
   const started = Date.now()
   const command = [file, ...args].join(' ')
   try {
@@ -463,7 +467,8 @@ async function systemRun(file: string, args: string[], options: RunOptions = {})
     return stdout
   } catch (error) {
     const failure = describeFailure(error)
-    const benign = options.benign?.test(failure.stdout) ?? false
+    const missing = (error as { code?: unknown } | null)?.code === 'ENOENT'
+    const benign = (options.benign?.test(failure.stdout) ?? false) || (options.optional === true && missing)
     recordCommand({ command, ok: benign, durationMs: Date.now() - started, at: new Date(started).toISOString(), ...(benign ? {} : { error: failure.message }) })
     throw failure
   }
@@ -488,9 +493,9 @@ function failure<T>(error: unknown, fallback: T): Source<T> {
   return { availability: 'unavailable', data: fallback, error: { code, message: code === 'TIMEOUT' ? 'Read timed out.' : message } }
 }
 
-async function read<T>(run: Run, file: string, args: string[], parse: (output: string) => T, fallback: T): Promise<Source<T>> {
+async function read<T>(run: Run, file: string, args: string[], parse: (output: string) => T, fallback: T, options?: RunOptions): Promise<Source<T>> {
   try {
-    return { availability: 'available', data: parse(await run(file, args)) }
+    return { availability: 'available', data: parse(await run(file, args, options)) }
   } catch (error) {
     return failure(error, fallback)
   }
@@ -505,7 +510,7 @@ export const PROFILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/
 export async function collectSnapshot(run: Run = systemRun): Promise<RuntimeSnapshot> {
   const [profiles, openCode] = await Promise.all([
     read(run, 'hermes', ['profile', 'list'], parseProfiles, []),
-    read(run, 'opencode', ['--version'], (value) => value.trim().split('\n').pop()?.trim() || 'Unknown', 'Unknown'),
+    read(run, 'opencode', ['--version'], (value) => value.trim().split('\n').pop()?.trim() || 'Unknown', 'Unknown', { optional: true }),
   ])
   return { profiles, openCode, fetchedAt: new Date().toISOString() }
 }
