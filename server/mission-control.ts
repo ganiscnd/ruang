@@ -114,7 +114,8 @@ export interface LogFile { name: string; label: string; source: Source<LogLine[]
 export interface LogsSnapshot { files: LogFile[]; fetchedAt: string }
 
 type Run = (file: string, args: string[], options?: RunOptions) => Promise<string>
-interface RunOptions {
+// custom: exported for server/custom (pipeline).
+export interface RunOptions {
   /** stdout of a non-zero exit that is an expected empty state, not a failure. */ benign?: RegExp
   /** The program is optional (OpenCode): not being installed is an expected state, not a failure. */ optional?: boolean
 }
@@ -799,7 +800,8 @@ export function parseRecentActivity(logOutput: string, sessionOutput?: string): 
 }
 
 /** Runs `task` over `items` with at most `limit` in flight, keeping the input order. */
-async function mapLimit<T, R>(items: readonly T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
+// custom: exported for server/custom (pipeline).
+export async function mapLimit<T, R>(items: readonly T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length)
   let next = 0
   const worker = async () => { while (next < items.length) { const index = next++; results[index] = await task(items[index]) } }
@@ -984,7 +986,8 @@ export function buildDashboard(parts: { runtime: RuntimeSnapshot; board: TaskBoa
 // ---------------------------------------------------------------------------
 // Cached accessors. Concurrent callers share one in-flight read per source.
 
-function cachedSource<T>(collect: () => Promise<T>, ttl = CACHE_MS) {
+// custom: exported for server/custom (pipeline).
+export function cachedSource<T>(collect: () => Promise<T>, ttl = CACHE_MS) {
   let entry: { value: T; expires: number } | undefined
   let inflight: Promise<T> | undefined
   const get = (now = Date.now()): Promise<T> => {
