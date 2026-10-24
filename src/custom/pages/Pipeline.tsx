@@ -4,6 +4,8 @@ import { formatNumber } from '../../format.ts'
 import { usePolling, type Polled } from '../../polling.ts'
 import type { Source } from '../../types.ts'
 import { EmptyState, LoadingState, PageTitle, SearchInput, SourceStatus, Unavailable } from '../../ui.tsx'
+import { AddLeadDialog, WritesOff } from '../ActionDialogs.tsx'
+import { useWriteAction } from '../use-write-action.tsx'
 import { LeadDetailDialog, UpworkLink } from '../LeadDetail.tsx'
 import { budgetLabel, dateLabel, daysLabel, fitLabel, matchesSearch, NOT_AVAILABLE, STAGE_TONE, stageColumn, UNKNOWN_STAGE, type StageColumn } from '../lead-view.ts'
 import { STAGES, type Lead, type PipelineSnapshot } from '../types.ts'
@@ -45,17 +47,30 @@ export function PipelineView({ snapshot }: { snapshot: Polled<PipelineSnapshot> 
   const openLead = (lead: Lead, element: HTMLElement) => { trigger.current = element; setOpen(lead) }
   const close = () => { setOpen(undefined); trigger.current?.focus() }
   const writesOff = data && !data.writes.enabled ? data.writes.reason ?? 'Write actions are not available.' : undefined
+  const [adding, setAdding] = useState(false)
+  const [message, setMessage] = useState<string | undefined>()
+  const write = useWriteAction((result) => {
+    snapshot.refresh()
+    if (!result.ok) return
+    setAdding(false)
+    setMessage(result.action === 'board.setup' ? 'The leads board is set up.' : result.action === 'lead.create' ? `Lead added${result.createdId ? ` (${result.createdId})` : ''} with the stage Found.` : undefined)
+  })
 
   return <>
     <PageTitle eyebrow="FREELANCE · HERMES KANBAN BOARD “LEADS”" title="Lead & proposal pipeline">Every Upwork lead and where it stands. Stages come from <code>stage:</code> comments on each card; a lead without one is Unknown. Refreshes every 30 seconds.</PageTitle>
     <SourceStatus source={source} fetchedAt={data?.fetchedAt} request={snapshot}/>
     {snapshot.status === 'pending' && <LoadingState message="Reading the leads board from Hermes…"/>}
     <Unavailable source={source} request={snapshot}/>
-    {board?.availability === 'available' && board.exists === false && <EmptyState title="Leads board not set up">Hermes has no Kanban board called <code>leads</code> yet. Setting it up is a one-time write action{writesOff ? `. ${writesOff}` : '.'}</EmptyState>}
+    {message && <p className="form-success" role="status">{message}</p>}
+    {board?.availability === 'available' && board.exists === false && <section className="empty-state"><h2>Leads board not set up</h2><p>Hermes has no Kanban board called <code>leads</code> yet. Setting it up is a one-time write action: <code>hermes kanban boards create … leads</code>.</p>
+      <div className="access-actions"><button type="button" className="primary-button" disabled={Boolean(writesOff) || write.busy} onClick={() => void write.start('board.setup', {})}>Set up leads board</button></div>
+      <WritesOff reason={writesOff}/>{write.error && !adding && <p className="form-error" role="alert">{write.error}</p>}
+    </section>}
     {board?.availability === 'available' && board.exists === true && <>
       <div className="toolbar">
         <SearchInput value={query} onChange={setQuery} label="Search leads (title, client, tags, stage)"/>
         <div className="view-toggle" role="group" aria-label="Pipeline view">{(['board', 'list'] as const).map((item) => <button type="button" key={item} className={view === item ? 'active' : ''} aria-pressed={view === item} onClick={() => setView(item)}>{item.toUpperCase()}</button>)}</div>
+        <button type="button" className="primary-button" disabled={Boolean(writesOff)} title={writesOff} onClick={() => { write.clearError(); setMessage(undefined); setAdding(true) }}>+ Add lead</button>
         <span className="toolbar-count">{visible.length} of {formatNumber(leads.length)} shown{data && data.omitted > 0 ? ` · ${data.omitted} older not loaded` : ''}</span>
       </div>
       {writesOff && <p className="file-notice">{writesOff}</p>}
@@ -72,5 +87,7 @@ export function PipelineView({ snapshot }: { snapshot: Polled<PipelineSnapshot> 
             <tbody>{visible.map((lead) => <tr key={lead.id}><td><button type="button" className="link-button" onClick={(event) => openLead(lead, event.currentTarget)}>{lead.title}</button>{lead.fields.tags.length > 0 && <div className="task-meta">{lead.fields.tags.map((tag) => <span key={tag} className="chip">{tag}</span>)}</div>}</td><td>{lead.fields.client ?? NOT_AVAILABLE}</td><td>{budgetLabel(lead.fields.budget)}</td><td>{dateLabel(lead.fields.posted)}</td><td>{fitLabel(lead.fields.fit)}</td><td><span className={`badge ${STAGE_TONE[stageColumn(lead)]}`}>{stageColumn(lead)}</span></td><td>{daysLabel(lead)}</td><td>{lead.assignedAgent ?? '—'}</td><td><UpworkLink url={lead.fields.upworkUrl}/></td></tr>)}</tbody></table></div>}
     </>}
     {open && <LeadDetailDialog key={open.id} lead={open} onClose={close}/>}
+    {adding && <AddLeadDialog onClose={() => setAdding(false)} onPreview={(params) => void write.start('lead.create', params)} error={write.error} busy={write.busy}/>}
+    {write.dialog}
   </>
 }

@@ -79,7 +79,7 @@ export interface DashboardSnapshot {
   commands: CommandHealth
   fetchedAt: string
 }
-export interface CommandLogEntry { command: string; ok: boolean; durationMs: number; at: string; error?: string }
+export interface CommandLogEntry { command: string; ok: boolean; durationMs: number; at: string; error?: string; /** custom: a write action. */ write?: boolean }
 export interface CommandLogSnapshot { entries: CommandLogEntry[]; health: CommandHealth; fetchedAt: string }
 export type LogLevel = 'ERROR' | 'WARNING' | 'INFO' | 'DEBUG' | 'OTHER'
 export interface LogLine { text: string; level: LogLevel }

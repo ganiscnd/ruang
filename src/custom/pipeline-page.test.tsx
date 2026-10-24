@@ -44,4 +44,14 @@ describe('pipeline page states', () => {
     expect(markup).toContain('Client Not Available')
     expect(markup).toContain('2 of 2 shown')
   })
+
+  it('disables write buttons with the reason while writes are off, and enables them when on', () => {
+    const off = render(ready({ board: { slug: 'leads', exists: false, availability: 'available' } }))
+    expect(off).toMatch(/<button[^>]*disabled=""[^>]*>Set up leads board<\/button>/)
+    expect(off).toContain('Write actions need the access code. Turn it on in Settings.')
+    const on = render(ready({ board: { slug: 'leads', exists: false, availability: 'available' }, writes: { enabled: true } }))
+    expect(on).toMatch(/<button type="button" class="primary-button">Set up leads board<\/button>/)
+    expect(render(ready({}))).toMatch(/<button[^>]*disabled=""[^>]*>\+ Add lead<\/button>/)
+    expect(render(ready({ writes: { enabled: true } }))).toMatch(/<button type="button" class="primary-button">\+ Add lead<\/button>/)
+  })
 })

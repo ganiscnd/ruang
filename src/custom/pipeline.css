@@ -12,3 +12,13 @@
 .lead-table td:first-child, .lead-table td:last-child { font: inherit; white-space: normal; }
 .table-scroll { overflow-x: auto; }
 .stage-ignored { opacity: .6; }
+.confirm-summary { display: grid; gap: 4px; margin: 8px 0 12px; padding-left: 18px; }
+.lead-form { display: grid; gap: 6px; }
+.lead-form .segmented { margin-top: 6px; }
+.lead-form-row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.lead-form-row .field-label { display: grid; gap: 4px; }
+.lead-form textarea { font-family: inherit; resize: vertical; }
+.lead-form .access-actions { margin-top: 10px; }
+.writes-off { margin: 6px 0 0; }
+.lead-actions { display: grid; gap: 10px; }
+.lead-actions form { display: grid; gap: 6px; }
