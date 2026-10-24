@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Always-on Ruang (production build) for user kimi. Installed by scripts/install-service.sh into
+     ~/Library/LaunchAgents/. Same pattern as Hermes' own ai.hermes.dashboard job. -->
+<plist version="1.0">
+<dict>
+<key>Label</key>
+<string>com.ganiscnd.ruang</string>
+<key>ProgramArguments</key>
+<array>
+<string>/usr/local/bin/node</string>
+<string>/Users/kimi/projects/ruang/bin/ruang.js</string>
+<string>--port</string>
+<string>3001</string>
+</array>
+<key>EnvironmentVariables</key>
+<dict>
+<key>HOME</key>
+<string>/Users/kimi</string>
+<!-- hermes lives in ~/.local/bin; launchd's default PATH would not find it. -->
+<key>PATH</key>
+<string>/Users/kimi/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+<key>NODE_ENV</key>
+<string>production</string>
+</dict>
+<key>WorkingDirectory</key>
+<string>/Users/kimi/projects/ruang</string>
+<key>RunAtLoad</key>
+<true/>
+<key>KeepAlive</key>
+<true/>
+<key>ThrottleInterval</key>
+<integer>20</integer>
+<key>StandardOutPath</key>
+<string>/Users/kimi/Library/Logs/ruang/ruang.log</string>
+<key>StandardErrorPath</key>
+<string>/Users/kimi/Library/Logs/ruang/ruang.log</string>
+</dict>
+</plist>

@@ -3,6 +3,21 @@
 Planned features for this fork. Nothing here is built yet. Custom code goes in `server/custom/`
 and `src/custom/`, with small marked hooks in upstream files (see `CLAUDE.md`).
 
+## Decisions (2026-10-24)
+
+1. **Pipeline stage** is stored as a Kanban comment `stage: <Stage>`. The newest stage comment wins;
+   no stage comment means **Unknown**. The dated stage history is kept and feeds the Scorecard.
+2. **Lead cards are never auto-assigned.** An agent only starts work when the owner clicks an
+   explicit "Assign to agent" button (with confirmation).
+3. **Token cost per proposal** shows "Not Available" if Hermes does not record tokens per task. If a
+   dedicated proposal-writing profile is used later, show an **average** (that profile's tokens for
+   the period ÷ proposals drafted in the period), clearly labelled as an average, never as a
+   per-proposal value.
+4. **The access code must be enabled before any write action is allowed.** When it is off, write
+   buttons are disabled with a clear explanation (and the server refuses writes too).
+5. **Reject** = block the card with a reason comment (reversible). A lead that is truly lost gets
+   `stage: Lost` and is then marked done.
+
 ## What Hermes gives us (v0.22.4, checked with `--help` only)
 
 Kanban statuses are fixed by Hermes: `triage, todo, ready, running, blocked, scheduled, review,
@@ -34,7 +49,8 @@ None of those should be exposed in the UI.
 **Important Hermes behaviour:** the gateway runs the Kanban dispatcher. A task that is `ready` and
 has an assignee gets claimed and **run by that agent automatically**. On the `leads` board, assigning
 a card means "agent, work on this now". That is useful for research and drafting, but the UI must
-make it explicit.
+make it explicit. Per decision 2, lead cards are created **unassigned**, and assigning only
+happens through the confirmed "Assign to agent" action.
 
 ## Shared foundation: a guarded write path (build first, with Feature 1)
 
@@ -52,6 +68,8 @@ make it explicit.
 - Audit entries get a `write: true` flag so the Logs page can highlight them. The upstream audit log
   is in memory and keeps only the last 100 runs, so writes also get an append-only file in
   `~/.config/ruang/` (Ruang's own config, never Hermes files).
+- Writes are refused by the server (and their buttons disabled in the UI, with an explanation)
+  unless the access code is enabled and unlocked in this browser (decision 4).
 - Successful writes clear the task-board cache so the UI reflects them at once.
 - The sidebar label "READ-ONLY MODE" becomes "READ-ONLY + APPROVED ACTIONS".
 
@@ -61,12 +79,10 @@ A dedicated board, created once with a confirmed `hermes kanban boards create le
 Each Upwork lead is one task, and agents write to it with the same CLI. Hermes statuses cannot hold our
 eight stages, so the **stage is recorded as a structured comment** (`stage: Researched`, written by
 `hermes kanban comment`). The latest stage comment wins, and the comment history gives timestamps for
-free. A lead with no stage comment shows as **Unknown**, never guessed. Won/Lost leads are closed
-with `complete --result "Won"`/`"Lost"` (`--metadata` can carry structured facts). The page
+free. A lead with no stage comment shows as **Unknown**, never guessed. A won or lost lead first gets
+`stage: Won` / `stage: Lost` and is then closed with `complete --result "Won"`/`"Lost"`. The page
 (`src/custom/pages/Leads.tsx`, a new menu item) reads `hermes kanban --board leads list --json`
 plus `show --json` per lead (bounded concurrency, cached), and renders a column per stage.
-Alternative to decide: encode the stage in the title prefix via `edit --title` (simpler to read,
-easier to corrupt).
 
 ## 2. Approval Queue
 
@@ -76,7 +92,8 @@ Agents put a drafted proposal or message in the task body/result and call
 Actions, each through the guarded write path:
 **Approve** = `comment -- <id> "stage: Approved"` then `complete <id> --result "Approved by owner"`.
 **Request changes** = `request-changes <id> -- <reason>`.
-**Reject** = `block --kind needs_input <id> -- <reason>` (or `archive`, to decide).
+**Reject** = `block --kind needs_input <id> -- <reason>` (Hermes appends the reason as a comment;
+reversible with `unblock`).
 Ruang never sends anything to Upwork itself. "Sent" is set when the owner (or an agent) records it.
 
 ## 3. Weekly Freelance Scorecard
@@ -87,8 +104,9 @@ the counts shown next to the percentage. A rate with a zero denominator shows "N
 **Token cost per proposal** is the uncertain part. `hermes insights` reports tokens per profile per
 period, not per task, so dividing it by proposals would be a guess. Before building this, check
 whether `kanban show --json` runs (or `kanban runs`) carry per-run token/cost data. If they do, sum
-it per lead; if not, show "Not Available" plus the profile-level weekly cost, clearly labelled as
-not per proposal.
+it per lead. If not, show "Not Available" (decision 3). Once a dedicated proposal-writing profile
+exists, also show that profile's tokens for the week ÷ proposals drafted that week, labelled
+"Average per proposal (estimate)".
 
 ## 4. Proposal Desk room
 
@@ -100,11 +118,3 @@ office gets a desk cluster defined in `src/custom/proposal-desk-layout.ts` (coor
 like `office3d-layout.test.ts`) and drawn by a small component, with `placementFor` handling the
 new `roomPosition`. An agent with no leads work never appears there, so the room shows real state
 only.
-
-## Open questions
-
-1. Stage storage: structured comments (recommended) or title prefix?
-2. Reject: block (stays visible, reversible) or archive?
-3. Should lead cards ever be auto-dispatched to an agent (assigned + ready), or only on an explicit
-   "Assign to agent" action?
-4. Should write actions require the access code to be switched on?

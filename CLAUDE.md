@@ -36,12 +36,35 @@ npm run lint
 npm test             # vitest; tests use fake command runners, never the real hermes
 ```
 
-- Port: `RUANG_PORT` or `ruang --port <n>`. Use a spare port (e.g. 3011) for checks so the owner's
-  own server on 3001 is not disturbed.
-- Remote viewing: `ssh -L 3001:127.0.0.1:3001 kimi@<mac-mini>` (the server binds 127.0.0.1 only).
+- **Development and test servers always use port 3002** (`RUANG_PORT=3002 npm start`, or
+  `RUANG_PORT=3002 npm run dev:server`). Port 3001 belongs to the always-on instance; never start,
+  stop or kill anything on 3001 except through the scripts below. When stopping a test server, stop
+  that process only (never `pkill -f ruang.js`, which would also hit the service).
+- Remote viewing: Tailscale (see below), or `ssh -L 3001:127.0.0.1:3001 kimi@<mac-mini>`. The server
+  itself always binds 127.0.0.1 only.
 - Ruang's own config (access code, profile lock) lives in `~/.config/ruang/` (`RUANG_CONFIG_DIR`).
 - Machine: Mac mini M4, Hermes Agent v0.22.4 in `~/.hermes`, profiles `default` and `leadengineer`.
   OpenCode is not installed (it shows as Not Available; that is expected).
+
+## Always-on instance (launchd)
+
+Ruang runs 24/7 as the LaunchAgent `com.ganiscnd.ruang` (same pattern as Hermes' own
+`ai.hermes.dashboard`): `node bin/ruang.js --port 3001` from `~/projects/ruang`, using the
+production build (`dist/` + `build/server/`), with `RunAtLoad` and `KeepAlive` (restarted by
+launchd after a crash, 20 s throttle). `PATH` includes `~/.local/bin` so `hermes` is found. Logs:
+`~/Library/Logs/ruang/ruang.log`. The plist source is `scripts/launchd/com.ganiscnd.ruang.plist`.
+
+| Script | When to use it |
+| --- | --- |
+| `scripts/deploy.sh` | **After every finished feature** (after lint/test/build pass and the commit): runs `npm run build`, restarts the service with `launchctl kickstart -k`, and waits for `/api/health`. It does not `git pull`. |
+| `scripts/status.sh` | Is the service running? Shows launchd state, PID, restarts, last exit, the health check, and the last 20 log lines. |
+| `scripts/install-service.sh` | Only after changing the plist (or on a new machine): copies it to `~/Library/LaunchAgents`, builds, and reloads the job. |
+
+Stop or start by hand: `launchctl bootout gui/$(id -u)/com.ganiscnd.ruang` /
+`launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ganiscnd.ruang.plist`.
+
+Remote access over Tailscale (tailnet only, never `tailscale funnel`): `tailscale serve` proxies
+HTTPS on the Mac's MagicDNS name to 127.0.0.1:3001. See `docs/reports/02-phase2.md`.
 
 ## Architecture map
 
