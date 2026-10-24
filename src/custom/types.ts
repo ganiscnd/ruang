@@ -29,4 +29,4 @@ export interface LeadDetail extends Lead {
 export interface PipelineBoard { slug: string; exists: boolean | 'unknown'; availability: 'available' | 'unavailable'; error?: string }
 export interface WriteStatus { enabled: boolean; reason?: string }
 export interface PipelineSnapshot { board: PipelineBoard; leads: Lead[]; omitted: number; writes: WriteStatus; fetchedAt: string }
-export interface LeadDetailSnapshot { lead: LeadDetail; board: PipelineBoard; writes: WriteStatus; fetchedAt: string }
+export interface LeadDetailSnapshot { lead: LeadDetail; board: PipelineBoard; writes: WriteStatus; /** Hermes profiles that can be assigned. */ agents: string[]; fetchedAt: string }

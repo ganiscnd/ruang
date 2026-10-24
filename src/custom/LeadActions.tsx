@@ -21,6 +21,8 @@ export function LeadActions({ detail, start, busy, error, message }: LeadActionP
   const [stage, setStage] = useState<Stage>(STAGES[nextIndex])
   const [reason, setReason] = useState('')
   const [note, setNote] = useState('')
+  const [agent, setAgent] = useState(detail.agents[0] ?? '')
+  const [kind, setKind] = useState<'research' | 'proposal'>(lead.stage === 'Researched' ? 'proposal' : 'research')
   const off = writes.enabled ? undefined : writes.reason ?? 'Write actions are not available.'
   const closed = lead.status === 'done'
   const openWork = lead.workCards.filter((card) => OPEN_WORK.has(card.status))
@@ -28,6 +30,7 @@ export function LeadActions({ detail, start, busy, error, message }: LeadActionP
   const submitStage = (event: FormEvent) => { event.preventDefault(); void start('lead.stage', { id: lead.id, stage, ...(reason.trim() ? { reason } : {}) }) }
   // The panel is remounted after a successful write (see Pipeline), which also clears the note.
   const submitNote = (event: FormEvent) => { event.preventDefault(); void start('lead.note', { id: lead.id, text: note }) }
+  const submitAssign = (event: FormEvent) => { event.preventDefault(); void start('lead.assign', { id: lead.id, profile: agent, kind }) }
 
   return <section className="task-section lead-actions" aria-label="Lead actions">
     <p className="eyebrow">ACTIONS</p>
@@ -42,6 +45,17 @@ export function LeadActions({ detail, start, busy, error, message }: LeadActionP
       </div>
       <textarea className="text-input" rows={2} placeholder="Reason (optional, saved under the stage line)" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} disabled={Boolean(off)} aria-label="Reason for the stage change"/>
       {closing && <p className="small-note muted">{stage} also marks the lead card done in Hermes. That is final.{openWork.length > 0 ? ` It cannot be done while a work card is open (${openWork.map((card) => `${card.id}: ${card.status}`).join(', ')}).` : ''}</p>}
+    </form>}
+    {!closed && <form onSubmit={submitAssign}>
+      <label className="field-label" htmlFor="lead-agent">Assign to agent</label>
+      {detail.agents.length === 0 ? <p className="small-note muted">No Hermes profiles could be read, so no agent can be assigned right now.</p> : <>
+        <div className="code-input-row">
+          <select id="lead-agent" className="text-input" value={agent} onChange={(event) => setAgent(event.target.value)} disabled={Boolean(off)} aria-label="Agent">{detail.agents.map((name) => <option key={name} value={name}>{name}</option>)}</select>
+          <select className="text-input" value={kind} onChange={(event) => setKind(event.target.value as 'research' | 'proposal')} disabled={Boolean(off)} aria-label="Job"><option value="research">Research the lead</option><option value="proposal">Draft a proposal</option></select>
+          <button type="submit" className="primary-button" disabled={Boolean(off) || busy || !agent}>Assign to agent…</button>
+        </div>
+        <p className="small-note muted">Creates a separate work card for the agent, linked to this lead. The agent starts within about a minute and uses tokens. The lead card itself is never assigned.</p>
+      </>}
     </form>}
     <form onSubmit={submitNote}>
       <label className="field-label" htmlFor="lead-note">Add a note</label>

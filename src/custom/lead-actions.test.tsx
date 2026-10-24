@@ -4,7 +4,7 @@ import { LeadActions } from './LeadActions.tsx'
 import type { LeadDetail, LeadDetailSnapshot } from './types.ts'
 
 const lead: LeadDetail = { id: 't_a', title: 'Procore RFI routing', status: 'ready', fields: { tags: [], notes: '' }, hasBlock: true, stage: 'Interview', historyAvailable: true, workCards: [], stageHistory: [], comments: [] }
-const snapshot = (extra: Partial<LeadDetail> = {}, enabled = true): LeadDetailSnapshot => ({ lead: { ...lead, ...extra }, board: { slug: 'leads', exists: true, availability: 'available' }, writes: enabled ? { enabled: true } : { enabled: false, reason: 'Write actions need the access code. Turn it on in Settings.' }, fetchedAt: '2026-10-24T10:00:00.000Z' })
+const snapshot = (extra: Partial<LeadDetail> = {}, enabled = true): LeadDetailSnapshot => ({ lead: { ...lead, ...extra }, board: { slug: 'leads', exists: true, availability: 'available' }, writes: enabled ? { enabled: true } : { enabled: false, reason: 'Write actions need the access code. Turn it on in Settings.' }, agents: ['default', 'leadengineer'], fetchedAt: '2026-10-24T10:00:00.000Z' })
 const render = (detail: LeadDetailSnapshot) => renderToStaticMarkup(<LeadActions detail={detail} start={async () => true} busy={false}/>)
 
 describe('lead actions panel', () => {
@@ -27,5 +27,14 @@ describe('lead actions panel', () => {
     expect(closed).toContain('This lead is closed (done, Lost)')
     expect(closed).not.toContain('Change stage…')
     expect(closed).toContain('Add note…')
+  })
+
+  it('offers only the Hermes profiles for Assign to agent, and never for a closed lead', () => {
+    const markup = render(snapshot({ stage: 'Researched' }))
+    expect(markup).toContain('<option value="leadengineer">leadengineer</option>')
+    expect(markup).toMatch(/<option value="proposal" selected="">Draft a proposal<\/option>/)
+    expect(markup).toContain('The lead card itself is never assigned.')
+    expect(render(snapshot({ status: 'done', stage: 'Won' }))).not.toContain('Assign to agent')
+    expect(render({ ...snapshot(), agents: [] })).toContain('No Hermes profiles could be read')
   })
 })

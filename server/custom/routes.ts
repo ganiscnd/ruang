@@ -81,10 +81,11 @@ export function installCustom(app: Express, options: CustomOptions): void {
   app.get('/api/custom/pipeline/:id', async (request, response) => {
     const id = String(request.params.id)
     if (!TASK_ID.test(id)) { response.status(400).json({ error: 'Invalid lead id.' }); return }
-    const [data, privacy, access] = await Promise.all([source(now(request)), options.privacyOf(request), options.accessOf(request)])
+    const [data, privacy, access, agents] = await Promise.all([source(now(request)), options.privacyOf(request), options.accessOf(request), profiles()])
     const lead = data.leads.find((item) => item.id === id)
     if (!lead) { response.status(404).json({ error: 'Unknown lead.' }); return }
-    response.json({ lead: redactLead(lead, privacy), board: data.board, writes: writeStatus(access), fetchedAt: data.fetchedAt })
+    // `agents`: the Hermes profiles "Assign to agent" may pick (validated again on the server).
+    response.json({ lead: redactLead(lead, privacy), board: data.board, writes: writeStatus(access), agents, fetchedAt: data.fetchedAt })
   })
 
   const context = async (fresh: boolean): Promise<ActionContext> => {
