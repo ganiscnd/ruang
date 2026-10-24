@@ -6,6 +6,7 @@ import type { Source } from '../../types.ts'
 import { EmptyState, LoadingState, PageTitle, SearchInput, SourceStatus, Unavailable } from '../../ui.tsx'
 import { AddLeadDialog, WritesOff } from '../ActionDialogs.tsx'
 import { useWriteAction } from '../use-write-action.tsx'
+import { LeadActions } from '../LeadActions.tsx'
 import { LeadDetailDialog, UpworkLink } from '../LeadDetail.tsx'
 import { budgetLabel, dateLabel, daysLabel, fitLabel, matchesSearch, NOT_AVAILABLE, STAGE_TONE, stageColumn, UNKNOWN_STAGE, type StageColumn } from '../lead-view.ts'
 import { STAGES, type Lead, type PipelineSnapshot } from '../types.ts'
@@ -44,16 +45,21 @@ export function PipelineView({ snapshot }: { snapshot: Polled<PipelineSnapshot> 
   const source: Source<null> | undefined = board && { availability: board.availability, data: null, ...(board.error ? { error: { code: 'COMMAND_FAILED' as const, message: board.error } } : {}) }
   const leads = data?.leads ?? []
   const visible = leads.filter((lead) => matchesSearch(lead, query))
-  const openLead = (lead: Lead, element: HTMLElement) => { trigger.current = element; setOpen(lead) }
+  const openLead = (lead: Lead, element: HTMLElement) => { trigger.current = element; write.clearError(); setDetailMessage(undefined); setOpen(lead) }
   const close = () => { setOpen(undefined); trigger.current?.focus() }
   const writesOff = data && !data.writes.enabled ? data.writes.reason ?? 'Write actions are not available.' : undefined
   const [adding, setAdding] = useState(false)
   const [message, setMessage] = useState<string | undefined>()
+  const [detailMessage, setDetailMessage] = useState<string | undefined>()
+  const [reloadKey, setReloadKey] = useState(0)
   const write = useWriteAction((result) => {
     snapshot.refresh()
+    // Partial results change Hermes too, so the open lead is re-read either way.
+    if (result.leadId) setReloadKey((key) => key + 1)
     if (!result.ok) return
     setAdding(false)
     setMessage(result.action === 'board.setup' ? 'The leads board is set up.' : result.action === 'lead.create' ? `Lead added${result.createdId ? ` (${result.createdId})` : ''} with the stage Found.` : undefined)
+    setDetailMessage(result.action === 'lead.stage' ? 'Stage changed.' : result.action === 'lead.note' ? 'Note added.' : result.action === 'lead.assign' ? `Work card ${result.createdId ?? ''} created; the agent starts within about a minute.` : undefined)
   })
 
   return <>
@@ -86,7 +92,7 @@ export function PipelineView({ snapshot }: { snapshot: Polled<PipelineSnapshot> 
           : <div className="table-scroll"><table className="log-table lead-table"><thead><tr><th>Lead</th><th>Client</th><th>Budget</th><th>Posted</th><th>Fit</th><th>Stage</th><th>In stage</th><th>Agent</th><th>Upwork</th></tr></thead>
             <tbody>{visible.map((lead) => <tr key={lead.id}><td><button type="button" className="link-button" onClick={(event) => openLead(lead, event.currentTarget)}>{lead.title}</button>{lead.fields.tags.length > 0 && <div className="task-meta">{lead.fields.tags.map((tag) => <span key={tag} className="chip">{tag}</span>)}</div>}</td><td>{lead.fields.client ?? NOT_AVAILABLE}</td><td>{budgetLabel(lead.fields.budget)}</td><td>{dateLabel(lead.fields.posted)}</td><td>{fitLabel(lead.fields.fit)}</td><td><span className={`badge ${STAGE_TONE[stageColumn(lead)]}`}>{stageColumn(lead)}</span></td><td>{daysLabel(lead)}</td><td>{lead.assignedAgent ?? '—'}</td><td><UpworkLink url={lead.fields.upworkUrl}/></td></tr>)}</tbody></table></div>}
     </>}
-    {open && <LeadDetailDialog key={open.id} lead={open} onClose={close}/>}
+    {open && <LeadDetailDialog key={open.id} lead={open} onClose={close} reloadKey={reloadKey} actions={(detail) => <LeadActions key={reloadKey} detail={detail} start={write.start} busy={write.busy} error={write.error} message={detailMessage}/>}/>}
     {adding && <AddLeadDialog onClose={() => setAdding(false)} onPreview={(params) => void write.start('lead.create', params)} error={write.error} busy={write.busy}/>}
     {write.dialog}
   </>
