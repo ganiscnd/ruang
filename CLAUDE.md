@@ -24,6 +24,10 @@ The owner reads Python but not JavaScript/TypeScript: explain decisions in plain
   before fixing.
 - Make small, focused git commits with clear messages. Push to `origin` (the fork), never to
   `upstream`.
+- **Privacy: the fork on GitHub is public.** Never commit personal facts, rates, client data, lead
+  contents (titles, URLs, card ids, notes, agent findings) or job post text to the repo, including
+  in `docs/reports/` and test fixtures. Keep them only in `~/freelance-private/` or in Hermes.
+  Reports describe real runs generically ("the test lead", counts, statuses, token totals).
 
 ## Run, test, build
 
@@ -158,8 +162,31 @@ Write rules (never weaken):
   `link <work> <lead>` (work = parent). While a work card is open the lead sits in `todo` and cannot
   be closed (Hermes refuses `complete` while a parent is open).
 - Won/Lost = `stage:` comment, then `complete --result=<Won|Lost>`. Final.
-- `kanban.auto_decompose` is off in both profiles (set 2026-10-24); keep it off.
+- `kanban.auto_decompose` is off in every profile (set 2026-10-24); keep it off.
 - New write actions go into `actions.ts` only, with tests of their exact argv.
+- Work cards carry `--skill=leads-protocol` (+ `--skill=freelancer-facts` for proposals),
+  `--max-runtime=15m` and `--max-retries=1` (one attempt; a failure or timeout blocks the card).
+
+### Lead agents (Hermes profiles, set up 2026-10-25)
+
+| Profile | Job | Toolsets | Skills (via `skills.external_dirs`) |
+| --- | --- | --- | --- |
+| `lead-researcher` | Research a lead, comment `stage: Researched` | `web`, `skills`, `todo` | `leads-protocol` |
+| `proposal-writer` | Draft a proposal, comment `stage: Proposal Drafted` | `web`, `skills`, `todo` | `leads-protocol`, `freelancer-facts` |
+
+- Both are clones of `leadengineer` without messaging (no bot tokens, 0 adapters), served by the
+  default profile's multiplexed gateway (it runs the kanban dispatcher and executes their cards).
+  Each has a role `SOUL.md`, `agent.max_turns 30`, `agent.run_budget_seconds 600` and
+  `skills.write_approval true` (an agent's skill edits are only staged).
+- `hermes/skills/leads-protocol/SKILL.md` in this repo is the agent-facing protocol
+  (`docs/LEADS_PROTOCOL.md` is the human summary; keep them in step). Edits take effect for the
+  next card, no reinstall.
+- `~/freelance-private/hermes-skills/freelancer-facts/SKILL.md` holds the owner's facts. It is
+  private, outside the repo, written only by the owner. Never copy it into the repo.
+- If none of a card's `--skill` skills exist for the assignee, Hermes refuses the run before any
+  model call (`kanban_skills_unavailable`), so other profiles cannot do lead work.
+- Hermes has no token cap; the caps are turns, time and one attempt. Measure real use with
+  `hermes -p <profile> insights --days 1`.
 
 ### Testing writes safely
 

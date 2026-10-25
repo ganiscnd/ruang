@@ -1,11 +1,14 @@
 # Leads protocol (Hermes board: `leads`)
 
-Give this to every Hermes agent that works on leads or proposals.
+Human summary. Agents get the full rules from the Hermes skill
+`hermes/skills/leads-protocol/SKILL.md`, which Ruang force-loads on every work card (`--skill`).
+Keep both in step.
 
 ## Tools
 
 Use the kanban tools (`kanban_show`, `kanban_comment`, `kanban_complete`, `kanban_block`). Never
-shell out to `hermes kanban`.
+shell out to `hermes kanban`. Never create or link cards, and finish with `kanban_complete`, never a
+review request.
 
 ## What a lead looks like
 
@@ -49,15 +52,18 @@ to the owner. Ruang ignores them when an agent writes them.
 
 ## Research job
 
-1. Comment your findings on the lead card (client history, scope, risks, fit), starting with
-   `stage: Researched`.
-2. Finish your work card with `kanban_complete(summary="<short findings>")`.
+1. Use the job text on the lead card first (the owner may paste the job post as a note), then try
+   the Upwork URL once (often blocked: write "Not Available"). Never log in.
+2. Comment your findings on the lead card (summary, requirements, client signals, risks,
+   questions, sources), starting with `stage: Researched`.
+3. Finish your work card with `kanban_complete(summary="<short findings>")`.
 
 ## Proposal job
 
-1. Put the full proposal draft in `kanban_complete(summary="<draft>")` on your work card.
-2. Comment `stage: Proposal Drafted` on the lead card.
-3. Never send anything to Upwork or the client. The owner approves and sends.
+1. Facts about the freelancer only from the `freelancer-facts` skill; `[MISSING: ...]` otherwise.
+2. Put the full proposal draft in `kanban_complete(summary="<draft>")` on your work card.
+3. Comment `stage: Proposal Drafted` on the lead card.
+4. Never send anything to Upwork or the client. The owner approves and sends.
 
 ## Rules
 
