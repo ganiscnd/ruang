@@ -55,7 +55,10 @@ to the owner. Ruang ignores them when an agent writes them.
 1. Use the job text on the lead card first (the owner may paste the job post as a note), then try
    the Upwork URL once (often blocked: write "Not Available"). Never log in.
 2. Comment your findings on the lead card (summary, requirements, client signals, risks,
-   questions, sources), starting with `stage: Researched`.
+   questions, Niche fit, sources), starting with `stage: Researched`. Niche fit is a 1-5 score on
+   a fixed scale plus the post's hard requirements, each marked Met / Not shown in freelancer
+   facts / Unknown, judged only against the `freelancer-facts` skill (Not Available when it is
+   empty). Private facts are never copied into the comment.
 3. Finish your work card with `kanban_complete(summary="<short findings>")`.
 
 ## Proposal job

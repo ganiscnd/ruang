@@ -164,20 +164,22 @@ Write rules (never weaken):
 - Won/Lost = `stage:` comment, then `complete --result=<Won|Lost>`. Final.
 - `kanban.auto_decompose` is off in every profile (set 2026-10-24); keep it off.
 - New write actions go into `actions.ts` only, with tests of their exact argv.
-- Work cards carry `--skill=leads-protocol` (+ `--skill=freelancer-facts` for proposals),
-  `--max-runtime=15m` and `--max-retries=1` (one attempt; a failure or timeout blocks the card).
+- Work cards carry `--skill=leads-protocol --skill=freelancer-facts` (research uses the facts only
+  for the Niche fit section), `--max-runtime=15m` and `--max-retries=1` (one attempt; a failure or
+  timeout blocks the card).
 
 ### Lead agents (Hermes profiles, set up 2026-10-25)
 
 | Profile | Job | Toolsets | Skills (via `skills.external_dirs`) |
 | --- | --- | --- | --- |
-| `lead-researcher` | Research a lead, comment `stage: Researched` | `web`, `skills`, `todo` | `leads-protocol` |
+| `lead-researcher` | Research a lead (incl. Niche fit), comment `stage: Researched` | `web`, `skills`, `todo` | `leads-protocol`, `freelancer-facts` |
 | `proposal-writer` | Draft a proposal, comment `stage: Proposal Drafted` | `web`, `skills`, `todo` | `leads-protocol`, `freelancer-facts` |
 
 - Both are clones of `leadengineer` without messaging (no bot tokens, 0 adapters), served by the
   default profile's multiplexed gateway (it runs the kanban dispatcher and executes their cards).
   Each has a role `SOUL.md`, `agent.max_turns 30`, `agent.run_budget_seconds 600` and
   `skills.write_approval true` (an agent's skill edits are only staged).
+- Assign warns when the lead already has a finished run of the same job (a new run pays again).
 - `hermes/skills/leads-protocol/SKILL.md` in this repo is the agent-facing protocol
   (`docs/LEADS_PROTOCOL.md` is the human summary; keep them in step). Edits take effect for the
   next card, no reinstall.
