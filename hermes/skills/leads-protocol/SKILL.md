@@ -1,7 +1,7 @@
 ---
 name: leads-protocol
 description: How to research an Upwork lead or draft a proposal for it on the Kanban board "leads" (Ruang Mission Control). Load for every card whose title starts with "[lead ".
-version: 1.0.0
+version: 1.1.0
 metadata:
   hermes:
     tags: [kanban, leads, upwork, proposals]
@@ -64,10 +64,39 @@ Never invent facts. Anything you could not read is "unknown". Never guess number
    Client signals: <only what the post shows: country, budget, history, or "unknown">
    Risks / red flags: <scope creep, low budget, vague ask, ... or "none found">
    Questions to ask the client: <2-4>
+   Niche fit: <N>/5 (agent rating; the owner's own fit value is separate)
+   Why: <1-2 lines: which parts of the owner's niche the job matches or misses, from the job text>
+   Hard requirements:
+   - <requirement from the post> → Met (per freelancer facts) | Not shown in freelancer facts | Unknown
+   Client deal-breakers: <the post's own "we will not move forward with ..." lines, or "none stated">
    Sources: <job text in comments | Upwork page: read / Not Available | URLs used>
    ```
 
 4. `kanban_complete(summary="<one-paragraph findings>")` on **your work card**.
+
+## Niche fit (research job)
+
+Judge the job against the **Niche** and **Proof I can show** sections of the `freelancer-facts`
+skill. If that skill is missing, or those sections are empty or "none", write exactly
+`Niche fit: Not Available (freelancer facts not filled in)`, still list the hard requirements, and
+mark each one "Unknown". Never guess the owner's niche or skills.
+
+Score with this fixed scale (pick the highest line that fully applies):
+
+| Score | Meaning |
+|---|---|
+| 5 | Construction / AEC work that uses the owner's core stack |
+| 4 | The core stack in an adjacent field (engineering, real estate, field services, document-heavy B2B) |
+| 3 | The core stack in an unrelated industry |
+| 2 | Automation work outside the core stack (for example marketing-CRM funnels, VA-style automation) |
+| 1 | Not automation work |
+
+Hard requirements are the post's "must have", "required", "to apply, send / link ...", and
+"we will not move forward with ..." lines, plus any stated timezone, hours, language or
+certification requirement. Mark a requirement **Met** only when the freelancer facts say so
+explicitly (for example "n8n: 3 portfolio links"). Otherwise write "Not shown in freelancer facts".
+Never claim the owner has something. Never copy the owner's private facts (rates, project details,
+links) into the comment: only say Met / Not shown / Unknown.
 
 ## Procedure: proposal job
 
