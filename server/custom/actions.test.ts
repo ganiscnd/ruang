@@ -104,6 +104,7 @@ describe('allowlisted commands', () => {
     expect(built.summary.join(' ')).toContain('leadengineer is not the dedicated lead-researcher profile')
     expect(built.steps[0].display).toMatch(/^hermes kanban --board=leads create --assignee=leadengineer --skill=leads-protocol --skill=freelancer-facts --max-runtime=15m --max-retries=1 <--body: \d+ chars>/)
     expect(create.find((arg) => arg.startsWith('--body='))).toMatch(/^--body=lead: t_aa11\njob: research\n/)
+    expect(create.find((arg) => arg.startsWith('--body='))).toContain('Deliverables, Application questions (word for word) and Niche fit sections')
     expect(link).toEqual(['kanban', '--board=leads', 'link', '--', '\u0000created', 't_aa11'])
     expect(() => plan('lead.assign', { id: 't_aa11', profile: 'nobody', kind: 'research' }, context())).toThrow('Hermes profiles')
     expect(() => plan('lead.assign', { id: 't_aa11', profile: '-p', kind: 'research' }, context())).toThrow('Hermes profiles')

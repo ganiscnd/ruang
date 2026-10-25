@@ -1,7 +1,7 @@
 ---
 name: leads-protocol
 description: How to research an Upwork lead or draft a proposal for it on the Kanban board "leads" (Ruang Mission Control). Load for every card whose title starts with "[lead ".
-version: 1.1.0
+version: 1.2.0
 metadata:
   hermes:
     tags: [kanban, leads, upwork, proposals]
@@ -60,19 +60,33 @@ Never invent facts. Anything you could not read is "unknown". Never guess number
    ```
    stage: Researched
    Summary: <2-3 sentences: what the client wants>
-   Requirements: <bullet list, from the job text>
+   Deliverables: <bullet list: what the client wants built or delivered, from the job text>
+   Application questions:
+   1. <the client's first question to applicants, word for word>
+   2. <...>
    Client signals: <only what the post shows: country, budget, history, or "unknown">
    Risks / red flags: <scope creep, low budget, vague ask, ... or "none found">
    Questions to ask the client: <2-4>
    Niche fit: <N>/5 (agent rating; the owner's own fit value is separate)
-   Why: <1-2 lines: which parts of the owner's niche the job matches or misses, from the job text>
+   Why: <1-2 lines: which parts of the owner's niche and public tools the job matches or misses>
    Hard requirements:
-   - <requirement from the post> → Met (per freelancer facts) | Not shown in freelancer facts | Unknown
+   - <requirement about the freelancer> → Met (per freelancer facts) | Not shown in freelancer facts | Unknown
    Client deal-breakers: <the post's own "we will not move forward with ..." lines, or "none stated">
    Sources: <job text in comments | Upwork page: read / Not Available | URLs used>
    ```
 
 4. `kanban_complete(summary="<one-paragraph findings>")` on **your work card**.
+
+## Deliverables and application questions (research job)
+
+- **Deliverables** are what the client wants built or delivered: phases, workflows, documents,
+  SOPs, training, a Loom walkthrough. Never mark deliverables Met / Not shown / Unknown.
+- **Application questions** are every question or instruction the post asks applicants to answer
+  or include (for example under "To apply, please answer:", "Start your proposal with ...", or "A
+  short Loom ... is a big plus"). Copy each one **word for word**, numbered in the post's order,
+  including optional ones. Never shorten, merge or reword them: the proposal writer answers them
+  one by one. If the post asks none, write `Application questions: none`. If no job text could be
+  read, write `Application questions: Unknown (job text not available)`.
 
 ## Niche fit (research job)
 
@@ -91,18 +105,26 @@ Score with this fixed scale (pick the highest line that fully applies):
 | 2 | Automation work outside the core stack (for example marketing-CRM funnels, VA-style automation) |
 | 1 | Not automation work |
 
-Hard requirements are the post's "must have", "required", "to apply, send / link ...", and
-"we will not move forward with ..." lines, plus any stated timezone, hours, language or
-certification requirement. Mark a requirement **Met** only when the freelancer facts say so
-explicitly (for example "n8n: 3 portfolio links"). Otherwise write "Not shown in freelancer facts".
-Never claim the owner has something. Never copy the owner's private facts (rates, project details,
-links) into the comment: only say Met / Not shown / Unknown.
+Hard requirements are what the client requires **about the freelancer**: the post's "must have"
+and "required" experience, skills and proof (including "to apply, link ..." proof), the
+"we will not move forward with ..." lines, and any stated timezone, hours, language or
+certification requirement. Deliverables are not hard requirements. Mark a requirement **Met** only
+when the freelancer facts say so explicitly (for example "n8n: 3 portfolio links"). Otherwise
+write "Not shown in freelancer facts". Never claim the owner has something.
+
+Privacy: the comment may name the owner's public tools and skills (the facts' Core stack and Other
+tools; they are on the owner's public profiles) to explain Niche fit. It must **never** include
+the owner's rate, prices or pricing rules, personal details (education, work history, location,
+timezone, availability, Upwork profile stats), project names or details, links, or anything from
+the never-claim list. For those, say only Met / Not shown / Unknown.
 
 ## Procedure: proposal job
 
 1. `kanban_show` the lead card. Use its research comment and the job text.
 2. Facts about the freelancer come **only** from the `freelancer-facts` skill. If a fact you need
    is missing there, write `[MISSING: <what>]` in the draft instead of inventing it.
+   Answer **every** application question listed in the research comment, in its order. If the
+   research comment has none and the job text shows some, answer those.
 3. `kanban_complete(summary="<the full proposal draft>")` on **your work card**.
 4. `kanban_comment` on the lead card: first line `stage: Proposal Drafted`, then one line saying the
    draft is in work card `<your card id>`.
