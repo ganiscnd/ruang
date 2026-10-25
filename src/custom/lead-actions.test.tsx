@@ -46,6 +46,18 @@ describe('lead actions panel', () => {
     expect(proposal).toContain('Use proposal-writer for this job')
   })
 
+  it('blocks a proposal while research runs and warns when no agent research comment exists', () => {
+    const running = render(snapshot({ stage: 'Researched', workCards: [{ id: 't_w1', title: '[lead t_a] Research: x', status: 'running', assignee: 'lead-researcher' }] }))
+    expect(running).toContain('Research on this lead is not finished yet (t_w1: running).')
+    expect(running).toMatch(/<button type="submit" class="primary-button" disabled="">Assign to agent…<\/button>/)
+    expect(render(snapshot({ stage: 'Researched', stageHistory: [{ stage: 'Researched', author: 'owner' }] }))).toContain('This lead has no research comment from an agent yet.')
+    expect(render(snapshot({ stage: 'Researched', historyAvailable: false }))).toContain('unknown whether a research comment exists')
+    const ready = render(snapshot({ stage: 'Researched', stageHistory: [{ stage: 'Researched', author: 'lead-researcher' }] }))
+    expect(ready).not.toContain('research comment')
+    expect(ready).toMatch(/<button type="submit" class="primary-button">Assign to agent…<\/button>/)
+    expect(render(snapshot({ stage: 'Found' }))).not.toContain('research comment')
+  })
+
   it('warns when the selected job already finished on this lead', () => {
     const workCards = [{ id: 't_w1', title: '[lead t_a] Research: x', status: 'done', assignee: 'lead-researcher' }]
     expect(render(snapshot({ stage: 'Found', workCards }))).toContain('This lead already has 1 finished research run. A new run uses tokens again.')

@@ -1,7 +1,7 @@
 ---
 name: leads-protocol
 description: How to research an Upwork lead or draft a proposal for it on the Kanban board "leads" (Ruang Mission Control). Load for every card whose title starts with "[lead ".
-version: 1.2.0
+version: 1.3.0
 metadata:
   hermes:
     tags: [kanban, leads, upwork, proposals]
@@ -120,11 +120,22 @@ the never-claim list. For those, say only Met / Not shown / Unknown.
 
 ## Procedure: proposal job
 
-1. `kanban_show` the lead card. Use its research comment and the job text.
-2. Facts about the freelancer come **only** from the `freelancer-facts` skill. If a fact you need
+1. `kanban_show` the lead card and read **all** of it before writing:
+   - the body: the `[lead]` block and the free notes after `---` (the owner usually pastes the
+     full job post there),
+   - **every** comment by the owner (notes may hold the job post or parts of it),
+   - the **newest** comment whose first line is `stage: Researched` (Deliverables, Application
+     questions, Niche fit, Hard requirements, Client deal-breakers).
+   The job text and the research comment are two sources: use both. Never write that the job
+   text, a requirement or the application questions are missing when either source has them.
+   Write "missing" or `[MISSING: ...]` only for what is truly in neither. If there is no research
+   comment, say so once in your lead comment and work from the job text.
+2. Answer **every** application question, in the post's order: the research comment's numbered
+   list, plus any question in the job text that the list lacks. Copy each question first, then
+   answer it. If the research comment marks the questions "Unknown" and the job text does not show
+   them either, write `[MISSING: application questions (not in the job text or research)]`.
+   Facts about the freelancer come **only** from the `freelancer-facts` skill. If a fact you need
    is missing there, write `[MISSING: <what>]` in the draft instead of inventing it.
-   Answer **every** application question listed in the research comment, in its order. If the
-   research comment has none and the job text shows some, answer those.
 3. `kanban_complete(summary="<the full proposal draft>")` on **your work card**.
 4. `kanban_comment` on the lead card: first line `stage: Proposal Drafted`, then one line saying the
    draft is in work card `<your card id>`.

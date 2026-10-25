@@ -111,7 +111,7 @@ describe('allowlisted commands', () => {
     expect(() => plan('lead.assign', { id: 't_aa11', profile: 'default', kind: 'deploy' }, context())).toThrow('research or proposal')
     const busy = pipeline([lead('t_aa11', { workCards: [{ id: 't_w1', title: '[lead t_aa11] Research: x', status: 'ready', assignee: 'default' }] })])
     expect(() => plan('lead.assign', { id: 't_aa11', profile: 'default', kind: 'research' }, context(busy))).toThrow('already has an open research card')
-    expect(plan('lead.assign', { id: 't_aa11', profile: 'default', kind: 'proposal' }, context(busy)).steps).toHaveLength(2)
+    expect(() => plan('lead.assign', { id: 't_aa11', profile: 'default', kind: 'proposal' }, context(busy))).toThrow('A research run on this lead is not finished yet (t_w1: ready)')
     expect(built.summary.join(' ')).not.toContain('finished')
   })
 
@@ -120,6 +120,21 @@ describe('allowlisted commands', () => {
     const data = pipeline([lead('t_aa11', { workCards: [done('t_w1', 'Research'), done('t_w2', 'Research'), done('t_w3', 'Draft proposal')] })])
     expect(plan('lead.assign', { id: 't_aa11', profile: 'lead-researcher', kind: 'research' }, context(data)).summary).toContain('Warning: this lead already has 2 finished research runs. A new run uses tokens again.')
     expect(plan('lead.assign', { id: 't_aa11', profile: 'proposal-writer', kind: 'proposal' }, context(data)).summary).toContain('Warning: this lead already has 1 finished draft proposal run. A new run uses tokens again.')
+  })
+
+  it('blocks a proposal while research is open and warns when no agent research comment exists', () => {
+    const card = (status: string) => ({ id: 't_w1', title: '[lead t_aa11] Research: x', status, assignee: 'lead-researcher' })
+    const researched = { stage: 'Researched' as const, author: 'lead-researcher' }
+    const build = (extra: Partial<LeadDetail>) => plan('lead.assign', { id: 't_aa11', profile: 'proposal-writer', kind: 'proposal' }, context(pipeline([lead('t_aa11', extra)])))
+    for (const status of ['todo', 'ready', 'running', 'review']) expect(() => build({ workCards: [card(status)] })).toThrow(`(t_w1: ${status}). Wait until it is done`)
+    const none = 'Warning: this lead has no research comment from an agent yet.'
+    expect(build({ workCards: [card('blocked')] }).summary.join(' ')).toContain(none)
+    expect(build({ stageHistory: [{ stage: 'Researched', author: 'owner' }] }).summary.join(' ')).toContain(none)
+    expect(build({ historyAvailable: false }).summary.join(' ')).toContain('unknown whether a research comment exists')
+    const ok = build({ workCards: [card('done')], stageHistory: [researched] }).summary.join(' ')
+    expect(ok).not.toContain('research comment')
+    expect(plan('lead.assign', { id: 't_aa11', profile: 'lead-researcher', kind: 'research' }, context()).summary.join(' ')).not.toContain('research comment')
+    expect(build({ stageHistory: [researched] }).steps[0].args.find((arg) => arg.startsWith('--body='))).toContain('the newest research comment (first line stage: Researched)')
   })
 
   it('loads the protocol and facts skills for a proposal on the dedicated profile, with the cost caps', () => {

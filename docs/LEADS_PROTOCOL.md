@@ -66,11 +66,17 @@ to the owner. Ruang ignores them when an agent writes them.
 
 ## Proposal job
 
-1. Facts about the freelancer only from the `freelancer-facts` skill; `[MISSING: ...]` otherwise.
-   Answer every application question from the research comment, in order.
-2. Put the full proposal draft in `kanban_complete(summary="<draft>")` on your work card.
-3. Comment `stage: Proposal Drafted` on the lead card.
-4. Never send anything to Upwork or the client. The owner approves and sends.
+1. Read all of the lead card first: the body notes (the pasted job post), every owner comment, and
+   the newest research comment. Say something is missing only when it is in neither the job text
+   nor the research.
+2. Answer every application question (research list plus the job text), in order. Facts about the
+   freelancer only from the `freelancer-facts` skill; `[MISSING: ...]` otherwise.
+3. Put the full proposal draft in `kanban_complete(summary="<draft>")` on your work card.
+4. Comment `stage: Proposal Drafted` on the lead card.
+5. Never send anything to Upwork or the client. The owner approves and sends.
+
+Ruang refuses a proposal while a research card on the lead is still open (not blocked), and warns
+when the lead has no agent research comment yet.
 
 ## Rules
 

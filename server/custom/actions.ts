@@ -62,8 +62,21 @@ function requireBoard(context: ActionContext): void {
 function workBody(lead: { id: string; title: string; fields: LeadFields }, kind: WorkKind): string {
   const job = kind === 'research'
     ? ['Job: research this lead.', '1. Read the lead card with kanban_show(task_id="' + lead.id + '"), including every comment (the owner may have pasted the job post there).', '2. Try web_extract on the Upwork URL once; if it is blocked, write "Not Available" and continue. Never log in.', '3. Comment your findings on the LEAD card, including the Deliverables, Application questions (word for word) and Niche fit sections (Niche fit judged only against the freelancer-facts skill); the first line must be exactly: stage: Researched', '4. Finish this work card with kanban_complete(summary="<short findings>").']
-    : ['Job: draft a proposal for this lead.', '1. Read the lead card with kanban_show(task_id="' + lead.id + '"), including every comment.', '2. Facts about the freelancer only from the freelancer-facts skill; write [MISSING: ...] for anything not there.', '3. Put the full draft in kanban_complete(summary="<draft>") on THIS work card.', '4. Comment on the LEAD card; the first line must be exactly: stage: Proposal Drafted', 'Never send anything to Upwork or the client.']
+    : ['Job: draft a proposal for this lead.', '1. Read the lead card with kanban_show(task_id="' + lead.id + '"): the body notes (usually the pasted job post), every owner comment, and the newest research comment (first line stage: Researched).', '2. Answer every application question (from the research comment and the job text). Write [MISSING: ...] only for what is in neither.', '3. Facts about the freelancer only from the freelancer-facts skill; write [MISSING: ...] for anything not there.', '4. Put the full draft in kanban_complete(summary="<draft>") on THIS work card.', '5. Comment on the LEAD card; the first line must be exactly: stage: Proposal Drafted', 'Never send anything to Upwork or the client.']
   return [`lead: ${lead.id}`, `job: ${kind}`, '', ...job, '', 'Rules: follow the leads-protocol skill. Never assign, block, archive or complete the lead card; you may only set the stages Researched and Proposal Drafted; finish with kanban_complete, never a review request; create or link no cards; no secrets; say "unknown" instead of guessing.', '', `Lead "${lead.title}" at assignment time:`, formatLeadBody(lead.fields)].join('\n')
+}
+
+/** Research cards that block a proposal: every open status except blocked (a blocked card never finishes by itself). */
+const RESEARCH_RUNNING = new Set([...OPEN].filter((status) => status !== 'blocked'))
+
+/** Whether a proposal can use a research comment: an open research card, or no agent's `stage: Researched` comment yet. */
+export function researchState(lead: PipelineData['leads'][number]): { running?: { id: string; status: string }; missing?: string } {
+  const running = lead.workCards.find((card) => card.title.startsWith(`[lead ${lead.id}] ${WORK_KINDS.research}:`) && RESEARCH_RUNNING.has(card.status))
+  if (running) return { running: { id: running.id, status: running.status } }
+  if (!lead.historyAvailable) return { missing: 'Warning: the lead\'s comments could not be read, so it is unknown whether a research comment exists.' }
+  // A stage the owner set by hand holds no findings; only an agent's research comment counts.
+  if (!lead.stageHistory.some((entry) => entry.stage === 'Researched' && entry.author !== OWNER)) return { missing: 'Warning: this lead has no research comment from an agent yet. The proposal will use only the job text, without Niche fit, hard requirements or application questions from research.' }
+  return {}
 }
 
 /** Validates one request and builds its exact commands. Throws ValidationError / ActionError. */
@@ -138,6 +151,8 @@ export function plan(action: unknown, raw: unknown, context: ActionContext): Pla
       const prefix = `[lead ${lead.id}] ${WORK_KINDS[kind]}:`
       const busy = lead.workCards.find((card) => card.title.startsWith(prefix) && OPEN.has(card.status))
       if (busy) throw new ActionError(`This lead already has an open ${WORK_KINDS[kind].toLowerCase()} card (${busy.id}: ${busy.status}).`, 409)
+      const research = kind === 'proposal' ? researchState(lead) : undefined
+      if (research?.running) throw new ActionError(`A research run on this lead is not finished yet (${research.running.id}: ${research.running.status}). Wait until it is done, so the proposal can use its research comment.`, 409)
       const finished = lead.workCards.filter((card) => card.title.startsWith(prefix) && card.status === 'done').length
       const title = `${prefix} ${lead.title.slice(0, 120)}`
       const body = workBody(lead, kind)
@@ -153,6 +168,7 @@ export function plan(action: unknown, raw: unknown, context: ActionContext): Pla
           `Create a "${WORK_KINDS[kind]}" work card for "${lead.title}", assigned to ${profile}.`,
           `${profile} starts working on it within about a minute (the Hermes gateway runs it) and uses tokens.`,
           `Limits: one attempt only (a failure or timeout blocks the card), at most 15 minutes. Skills loaded: ${WORK_SKILLS[kind].join(', ')}.`,
+          ...(research?.missing ? [research.missing] : []),
           ...(finished ? [`Warning: this lead already has ${finished} finished ${WORK_KINDS[kind].toLowerCase()} run${finished === 1 ? '' : 's'}. A new run uses tokens again.`] : []),
           ...(profile === WORK_PROFILES[kind] ? [] : [`${profile} is not the dedicated ${WORK_PROFILES[kind]} profile: if it lacks these skills, Hermes stops the card at once.`]),
           'Link it to the lead card so the lead shows it.',

@@ -6,6 +6,8 @@ import type { ActionName } from './write-actions.ts'
 
 const CLOSING: readonly Stage[] = ['Won', 'Lost']
 const OPEN_WORK = new Set(['triage', 'todo', 'ready', 'running', 'blocked', 'review', 'scheduled'])
+/** Open research statuses that block a proposal (same rule as server/custom/actions.ts researchState). */
+const RESEARCH_RUNNING = new Set([...OPEN_WORK].filter((status) => status !== 'blocked'))
 type WorkKind = 'research' | 'proposal'
 /** The dedicated Hermes profiles (see server/custom/actions.ts WORK_PROFILES). */
 const WORK_PROFILES: Record<WorkKind, string> = { research: 'lead-researcher', proposal: 'proposal-writer' }
@@ -30,6 +32,8 @@ export function LeadActions({ detail, start, busy, error, message }: LeadActionP
   const [agent, setAgent] = useState(preferred(initialKind))
   const changeKind = (job: WorkKind) => { setKind(job); setAgent(preferred(job)) }
   const finished = lead.workCards.filter((card) => card.status === 'done' && card.title.startsWith(`[lead ${lead.id}] ${kind === 'research' ? 'Research' : 'Draft proposal'}:`)).length
+  const researchRunning = kind === 'proposal' ? lead.workCards.find((card) => card.title.startsWith(`[lead ${lead.id}] Research:`) && RESEARCH_RUNNING.has(card.status)) : undefined
+  const researchMissing = kind === 'proposal' && !researchRunning && (lead.historyAvailable ? (lead.stageHistory.some((entry) => entry.stage === 'Researched' && entry.author !== 'owner') ? undefined : 'none') : 'unknown')
   const off = writes.enabled ? undefined : writes.reason ?? 'Write actions are not available.'
   const closed = lead.status === 'done'
   const openWork = lead.workCards.filter((card) => OPEN_WORK.has(card.status))
@@ -59,9 +63,12 @@ export function LeadActions({ detail, start, busy, error, message }: LeadActionP
         <div className="code-input-row">
           <select id="lead-agent" className="text-input" value={agent} onChange={(event) => setAgent(event.target.value)} disabled={Boolean(off)} aria-label="Agent">{detail.agents.map((name) => <option key={name} value={name}>{name}</option>)}</select>
           <select className="text-input" value={kind} onChange={(event) => changeKind(event.target.value as WorkKind)} disabled={Boolean(off)} aria-label="Job"><option value="research">Research the lead</option><option value="proposal">Draft a proposal</option></select>
-          <button type="submit" className="primary-button" disabled={Boolean(off) || busy || !agent}>Assign to agent…</button>
+          <button type="submit" className="primary-button" disabled={Boolean(off) || busy || !agent || Boolean(researchRunning)}>Assign to agent…</button>
         </div>
         <p className="small-note muted">Creates a separate work card for the agent, linked to this lead. The agent starts within about a minute and uses tokens. The lead card itself is never assigned. One attempt only, at most 15 minutes. Use {WORK_PROFILES[kind]} for this job: other profiles lack the leads protocol and Hermes stops their card at once.</p>
+        {researchRunning && <p className="small-note form-error" role="note">Research on this lead is not finished yet ({researchRunning.id}: {researchRunning.status}). Wait until it is done, so the proposal can use its research comment.</p>}
+        {researchMissing === 'none' && <p className="small-note form-error" role="note">This lead has no research comment from an agent yet. A proposal now would use only the job text, without Niche fit, hard requirements or application questions from research.</p>}
+        {researchMissing === 'unknown' && <p className="small-note form-error" role="note">The lead&apos;s comments could not be read, so it is unknown whether a research comment exists.</p>}
         {finished > 0 && <p className="small-note form-error" role="note">This lead already has {finished} finished {kind === 'research' ? 'research' : 'proposal'} run{finished === 1 ? '' : 's'}. A new run uses tokens again.</p>}
       </>}
     </form>}

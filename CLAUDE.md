@@ -180,6 +180,9 @@ Write rules (never weaken):
   Each has a role `SOUL.md`, `agent.max_turns 30`, `agent.run_budget_seconds 600` and
   `skills.write_approval true` (an agent's skill edits are only staged).
 - Assign warns when the lead already has a finished run of the same job (a new run pays again).
+- Assign refuses a proposal while a research card on the lead is open (any open status except
+  `blocked`) and warns when no agent `stage: Researched` comment exists (an owner-set stage does not
+  count), in `researchState` (server) and `LeadActions.tsx` (UI).
 - `hermes/skills/leads-protocol/SKILL.md` in this repo is the agent-facing protocol
   (`docs/LEADS_PROTOCOL.md` is the human summary; keep them in step). Edits take effect for the
   next card, no reinstall.
