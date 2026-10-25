@@ -110,7 +110,8 @@ export function installCustom(app: Express, options: CustomOptions): void {
     }
   }
   const body = (request: Request) => (request.body && typeof request.body === 'object' ? request.body as Record<string, unknown> : {})
-  app.use('/api/custom/actions', express.json({ limit: '32kb' }), guard)
+  // Inputs are capped far lower by validate.ts; this only bounds what the JSON parser accepts.
+  app.use('/api/custom/actions', express.json({ limit: '64kb' }), guard)
   app.post('/api/custom/actions/preview', handle(async (request) => {
     const { action, params } = body(request)
     return actions.preview(action, params, await context(false), (await options.accessOf(request)).session!)
@@ -122,4 +123,10 @@ export function installCustom(app: Express, options: CustomOptions): void {
       afterWrite()
     }
   }))
+  // A body the JSON parser refuses gets a clear answer instead of the generic 500.
+  app.use('/api/custom/actions', (error: { type?: string }, _request: Request, response: Response, next: NextFunction) => {
+    if (error?.type === 'entity.too.large') { response.status(413).json({ error: 'This request is too large. Shorten the text and try again.' }); return }
+    if (error?.type === 'entity.parse.failed') { response.status(400).json({ error: 'The request could not be read.' }); return }
+    next(error)
+  })
 }

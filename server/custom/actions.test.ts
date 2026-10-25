@@ -237,4 +237,17 @@ describe('write routes', () => {
       expect((await post('/api/custom/actions/execute', { token: preview.token })).status).toBe(409)
     } finally { close() }
   })
+
+  it('takes a 6000-character note with accents, and answers clearly when a body is too large or unreadable', async () => {
+    const { post, base, close } = await serve({ enabled: true, unlocked: true, session: 'cookie' })
+    try {
+      const long = await post('/api/custom/actions/preview', { action: 'lead.note', params: { id: 't_aa11', text: 'é'.repeat(6000) } })
+      expect(long.status).toBe(200)
+      const huge = await post('/api/custom/actions/preview', { action: 'lead.note', params: { id: 't_aa11', text: 'x'.repeat(70_000) } })
+      expect(huge.status).toBe(413)
+      expect(await huge.json()).toEqual({ error: 'This request is too large. Shorten the text and try again.' })
+      const broken = await fetch(`${base}/api/custom/actions/preview`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-ruang-request': '1' }, body: '{"action":' })
+      expect(broken.status).toBe(400)
+    } finally { close() }
+  })
 })
