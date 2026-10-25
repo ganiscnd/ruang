@@ -164,6 +164,10 @@ Write rules (never weaken):
 - Won/Lost = `stage:` comment, then `complete --result=<Won|Lost>`. Final.
 - `kanban.auto_decompose` is off in every profile (set 2026-10-24); keep it off.
 - New write actions go into `actions.ts` only, with tests of their exact argv.
+- Notes and comments: at most 20,000 characters each (`LIMITS`, `NOTE_LIMIT`), never cut silently
+  (no `maxLength`; a live counter, and the server refuses longer text). Hermes stores any length,
+  but an agent's `kanban_show` result is cut to a preview above 100,000 characters, so a note that
+  takes the lead past `LEAD_TEXT_WARN` (50,000) warns.
 - Work cards carry `--skill=leads-protocol --skill=freelancer-facts` (research uses the facts only
   for the Niche fit section), `--max-runtime=15m` and `--max-retries=1` (one attempt; a failure or
   timeout blocks the card).

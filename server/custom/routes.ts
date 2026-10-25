@@ -111,7 +111,7 @@ export function installCustom(app: Express, options: CustomOptions): void {
   }
   const body = (request: Request) => (request.body && typeof request.body === 'object' ? request.body as Record<string, unknown> : {})
   // Inputs are capped far lower by validate.ts; this only bounds what the JSON parser accepts.
-  app.use('/api/custom/actions', express.json({ limit: '64kb' }), guard)
+  app.use('/api/custom/actions', express.json({ limit: '256kb' }), guard)
   app.post('/api/custom/actions/preview', handle(async (request) => {
     const { action, params } = body(request)
     return actions.preview(action, params, await context(false), (await options.accessOf(request)).session!)

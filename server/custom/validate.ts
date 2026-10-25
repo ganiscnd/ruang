@@ -5,7 +5,7 @@ import { isValidDate, MAX_TAGS, parseBudget, STAGES, TAG, UPWORK_URL, type Budge
 
 export class ValidationError extends Error {}
 
-export const LIMITS = { title: 150, client: 120, notes: 6000, comment: 6000, reason: 500, url: 300 } as const
+export const LIMITS = { title: 150, client: 120, notes: 20_000, comment: 20_000, reason: 500, url: 300 } as const
 
 type Params = Record<string, unknown>
 
@@ -35,7 +35,7 @@ export function cleanText(value: unknown, label: string, { max, min = 0, multili
     throw new ValidationError(`${label} is required.`)
   }
   if (text.length < min) throw new ValidationError(`${label} needs at least ${min} characters.`)
-  if (text.length > max) throw new ValidationError(`${label} can have at most ${max} characters.`)
+  if (text.length > max) throw new ValidationError(`${label} can have at most ${max.toLocaleString('en-US')} characters (this has ${text.length.toLocaleString('en-US')}). Shorten it${multiline ? ' or split it into two notes' : ''}.`)
   return text
 }
 

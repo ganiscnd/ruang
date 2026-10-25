@@ -21,3 +21,9 @@ async function post<T>(path: string, body: unknown): Promise<Answer<T>> {
 
 export const previewAction = (action: ActionName, params: Record<string, unknown>) => post<Preview>('/api/custom/actions/preview', { action, params })
 export const executeAction = (token: string) => post<ExecuteResult>('/api/custom/actions/execute', { token })
+
+/** Same limit as server/custom/validate.ts LIMITS.notes / LIMITS.comment. Text is never cut silently. */
+export const NOTE_LIMIT = 20_000
+/** Length as the server counts it (line breaks normalized, trimmed). */
+export const noteLength = (value: string) => value.replace(/\r\n?/g, '\n').trim().length
+export const tooLong = (value: string) => noteLength(value) > NOTE_LIMIT

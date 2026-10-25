@@ -1,8 +1,8 @@
 // custom: write actions inside the lead detail: change stage, add a note, assign to an agent.
 import { useState, type FormEvent } from 'react'
-import { WritesOff } from './ActionDialogs.tsx'
+import { CharCount, WritesOff } from './ActionDialogs.tsx'
 import { STAGES, type LeadDetailSnapshot, type Stage } from './types.ts'
-import type { ActionName } from './write-actions.ts'
+import { tooLong, type ActionName } from './write-actions.ts'
 
 const CLOSING: readonly Stage[] = ['Won', 'Lost']
 const OPEN_WORK = new Set(['triage', 'todo', 'ready', 'running', 'blocked', 'review', 'scheduled'])
@@ -74,8 +74,9 @@ export function LeadActions({ detail, start, busy, error, message }: LeadActionP
     </form>}
     <form onSubmit={submitNote}>
       <label className="field-label" htmlFor="lead-note">Add a note</label>
-      <textarea id="lead-note" className="text-input" rows={3} value={note} onChange={(event) => setNote(event.target.value)} maxLength={6000} disabled={Boolean(off)}/>
-      <button type="submit" className="primary-button" disabled={Boolean(off) || busy || !note.trim()}>Add note…</button>
+      <textarea id="lead-note" className="text-input" rows={3} value={note} onChange={(event) => setNote(event.target.value)} disabled={Boolean(off)} aria-describedby="lead-note-count"/>
+      <CharCount id="lead-note-count" value={note}/>
+      <button type="submit" className="primary-button" disabled={Boolean(off) || busy || !note.trim() || tooLong(note)}>Add note…</button>
     </form>
   </section>
 }

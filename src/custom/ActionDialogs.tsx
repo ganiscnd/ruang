@@ -1,7 +1,7 @@
 // custom: confirmation dialog for every write action, and the Add lead form.
 import { useState, type FormEvent } from 'react'
 import { Dialog } from '../ui.tsx'
-import { executeAction, type ExecuteResult, type Preview } from './write-actions.ts'
+import { executeAction, NOTE_LIMIT, noteLength, type ExecuteResult, type Preview } from './write-actions.ts'
 
 /** Shows what will happen and the exact commands; runs them only on Confirm. */
 export function ConfirmDialog({ preview, onClose, onDone }: { preview: Preview; onClose: () => void; onDone: (result: ExecuteResult) => void }) {
@@ -72,9 +72,21 @@ export function AddLeadDialog({ onClose, onPreview, error, busy }: { onClose: ()
       <label className="field-label" htmlFor="lead-tags">Tags (comma separated: a-z, 0-9, -)</label>
       <input id="lead-tags" className="text-input" placeholder="n8n, procore, rag" value={form.tags} onChange={set('tags')}/>
       <label className="field-label" htmlFor="lead-notes">Notes</label>
-      <textarea id="lead-notes" className="text-input" rows={5} value={form.notes} onChange={set('notes')} maxLength={6000}/>
+      <textarea id="lead-notes" className="text-input" rows={5} value={form.notes} onChange={set('notes')} aria-describedby="lead-notes-count"/>
+      <CharCount id="lead-notes-count" value={form.notes}/>
       {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="access-actions"><button type="submit" className="primary-button" disabled={busy}>{busy ? 'Checking…' : 'Review and confirm'}</button><button type="button" className="refresh-button" onClick={onClose}>CANCEL</button></div>
+      <div className="access-actions"><button type="submit" className="primary-button" disabled={busy || noteLength(form.notes) > NOTE_LIMIT}>{busy ? 'Checking…' : 'Review and confirm'}</button><button type="button" className="refresh-button" onClick={onClose}>CANCEL</button></div>
     </form>
   </Dialog>
+}
+
+
+/** Live character counter under a note box; over the limit it explains and the form refuses to send. */
+export function CharCount({ id, value }: { id: string; value: string }) {
+  const count = noteLength(value)
+  const over = count - NOTE_LIMIT
+  return <p id={id} className={`small-note ${over > 0 ? 'form-error' : 'muted'}`} aria-live="polite">
+    {count.toLocaleString('en-US')} / {NOTE_LIMIT.toLocaleString('en-US')} characters
+    {over > 0 && ` · Too long by ${over.toLocaleString('en-US')}. Nothing is cut off: shorten it or split it into two notes.`}
+  </p>
 }

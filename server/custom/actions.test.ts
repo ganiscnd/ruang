@@ -35,7 +35,7 @@ describe('write input validation', () => {
     [{ ...NEW_LEAD, budgetMin: '-5' }, 'number'],
     [{ ...NEW_LEAD, budgetMax: '10' }, 'lower than'],
     [{ ...NEW_LEAD, tags: 'ok, --assignee=x' }, 'may only use'],
-    [{ ...NEW_LEAD, notes: 'x'.repeat(6001) }, 'at most 6000'],
+    [{ ...NEW_LEAD, notes: 'x'.repeat(20_001) }, 'at most 20,000 characters (this has 20,001). Shorten it or split it into two notes.'],
     [{ ...NEW_LEAD, assignee: 'default' }, 'Unknown field: assignee'],
   ])('refuses bad input %#', (input, message) => {
     expect(() => leadInput(input, '2026-10-24')).toThrow(message)
@@ -120,6 +120,13 @@ describe('allowlisted commands', () => {
     const data = pipeline([lead('t_aa11', { workCards: [done('t_w1', 'Research'), done('t_w2', 'Research'), done('t_w3', 'Draft proposal')] })])
     expect(plan('lead.assign', { id: 't_aa11', profile: 'lead-researcher', kind: 'research' }, context(data)).summary).toContain('Warning: this lead already has 2 finished research runs. A new run uses tokens again.')
     expect(plan('lead.assign', { id: 't_aa11', profile: 'proposal-writer', kind: 'proposal' }, context(data)).summary).toContain('Warning: this lead already has 1 finished draft proposal run. A new run uses tokens again.')
+  })
+
+  it('warns when a note would make the lead text too long for an agent to read in one go', () => {
+    const note = (text: string, extra: Partial<LeadDetail> = {}) => plan('lead.note', { id: 't_aa11', text }, context(pipeline([lead('t_aa11', extra)]))).summary.join(' ')
+    expect(note('x'.repeat(20_000))).not.toContain('Warning')
+    const big = note('x'.repeat(20_000), { fields: { tags: [], notes: 'n'.repeat(20_000) }, comments: [{ author: 'lead-researcher', body: 'r'.repeat(10_001) }] })
+    expect(big).toContain("Warning: this lead's text (notes and comments) would reach 50,001 characters.")
   })
 
   it('blocks a proposal while research is open and warns when no agent research comment exists', () => {
@@ -262,12 +269,12 @@ describe('write routes', () => {
     } finally { close() }
   })
 
-  it('takes a 6000-character note with accents, and answers clearly when a body is too large or unreadable', async () => {
+  it('takes a 20,000-character note with accents, and answers clearly when a body is too large or unreadable', async () => {
     const { post, base, close } = await serve({ enabled: true, unlocked: true, session: 'cookie' })
     try {
-      const long = await post('/api/custom/actions/preview', { action: 'lead.note', params: { id: 't_aa11', text: 'é'.repeat(6000) } })
+      const long = await post('/api/custom/actions/preview', { action: 'lead.note', params: { id: 't_aa11', text: 'é'.repeat(20_000) } })
       expect(long.status).toBe(200)
-      const huge = await post('/api/custom/actions/preview', { action: 'lead.note', params: { id: 't_aa11', text: 'x'.repeat(70_000) } })
+      const huge = await post('/api/custom/actions/preview', { action: 'lead.note', params: { id: 't_aa11', text: 'x'.repeat(300_000) } })
       expect(huge.status).toBe(413)
       expect(await huge.json()).toEqual({ error: 'This request is too large. Shorten the text and try again.' })
       const broken = await fetch(`${base}/api/custom/actions/preview`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-ruang-request': '1' }, body: '{"action":' })

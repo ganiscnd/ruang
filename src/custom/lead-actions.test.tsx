@@ -1,5 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { CharCount } from './ActionDialogs.tsx'
+import { tooLong } from './write-actions.ts'
 import { LeadActions } from './LeadActions.tsx'
 import type { LeadDetail, LeadDetailSnapshot } from './types.ts'
 
@@ -56,6 +58,16 @@ describe('lead actions panel', () => {
     expect(ready).not.toContain('research comment')
     expect(ready).toMatch(/<button type="submit" class="primary-button">Assign to agent…<\/button>/)
     expect(render(snapshot({ stage: 'Found' }))).not.toContain('research comment')
+  })
+
+  it('counts note characters live and explains an over-long note instead of cutting it', () => {
+    expect(render(snapshot())).toContain('0 / 20,000 characters')
+    expect(render(snapshot())).not.toContain('maxlength')
+    expect(renderToStaticMarkup(<CharCount id="c" value={'x'.repeat(20_000)}/>)).not.toContain('Too long')
+    const over = renderToStaticMarkup(<CharCount id="c" value={'x'.repeat(20_150)}/>)
+    expect(over).toContain('20,150 / 20,000 characters')
+    expect(over).toContain('Too long by 150. Nothing is cut off: shorten it or split it into two notes.')
+    expect([tooLong('x'.repeat(20_000)), tooLong('x'.repeat(20_001)), tooLong(` ${'x'.repeat(20_000)}\n`)]).toEqual([false, true, false])
   })
 
   it('warns when the selected job already finished on this lead', () => {

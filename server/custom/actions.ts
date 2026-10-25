@@ -32,6 +32,11 @@ export const MAX_PER_DAY = 100
 /** Placeholder for the id of the card created by an earlier step (cannot come from input). */
 const CREATED = '\u0000created'
 const BOARD = `--board=${LEADS_BOARD}`
+/**
+ * Hermes hands a worker one kanban_show result of at most 100,000 characters (JSON, plus its own
+ * summary of the card); above that the agent gets only a short preview. Warn well before that.
+ */
+export const LEAD_TEXT_WARN = 50_000
 const OPEN = new Set(['triage', 'todo', 'ready', 'running', 'blocked', 'review', 'scheduled'])
 /** Statuses `hermes kanban complete` accepts. */
 const COMPLETABLE = new Set(['ready', 'running', 'blocked', 'review'])
@@ -138,7 +143,9 @@ export function plan(action: unknown, raw: unknown, context: ActionContext): Pla
       // A note never changes the stage: a first line that reads like a stage comment is refused.
       if (/^\s*stage\s*:/i.test(text)) throw new ValidationError('A note cannot start with "stage:". Use Change stage instead.')
       const args = ['kanban', BOARD, 'comment', `--author=${OWNER}`, '--', lead.id, text]
-      return { action: 'lead.note', leadId: lead.id, summary: [`Add a note to "${lead.title}".`], steps: [{ args, display: `hermes kanban ${BOARD} comment --author=${OWNER} -- ${lead.id} ${chars('note', text)}` }] }
+      const total = (lead.fields.notes?.length ?? 0) + lead.comments.reduce((sum, comment) => sum + comment.body.length, 0) + text.length
+      const big = total > LEAD_TEXT_WARN ? [`Warning: this lead's text (notes and comments) would reach ${total.toLocaleString('en-US')} characters. Hermes shows an agent about 100,000 characters of a card at most (with formatting), so above ${LEAD_TEXT_WARN.toLocaleString('en-US')} an agent may not see all of it.`] : []
+      return { action: 'lead.note', leadId: lead.id, summary: [`Add a note to "${lead.title}".`, ...big], steps: [{ args, display: `hermes kanban ${BOARD} comment --author=${OWNER} -- ${lead.id} ${chars('note', text)}` }] }
     }
     case 'lead.assign': {
       requireBoard(context)
