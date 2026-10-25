@@ -29,6 +29,7 @@ export function LeadActions({ detail, start, busy, error, message }: LeadActionP
   const [kind, setKind] = useState<WorkKind>(initialKind)
   const [agent, setAgent] = useState(preferred(initialKind))
   const changeKind = (job: WorkKind) => { setKind(job); setAgent(preferred(job)) }
+  const finished = lead.workCards.filter((card) => card.status === 'done' && card.title.startsWith(`[lead ${lead.id}] ${kind === 'research' ? 'Research' : 'Draft proposal'}:`)).length
   const off = writes.enabled ? undefined : writes.reason ?? 'Write actions are not available.'
   const closed = lead.status === 'done'
   const openWork = lead.workCards.filter((card) => OPEN_WORK.has(card.status))
@@ -61,6 +62,7 @@ export function LeadActions({ detail, start, busy, error, message }: LeadActionP
           <button type="submit" className="primary-button" disabled={Boolean(off) || busy || !agent}>Assign to agent…</button>
         </div>
         <p className="small-note muted">Creates a separate work card for the agent, linked to this lead. The agent starts within about a minute and uses tokens. The lead card itself is never assigned. One attempt only, at most 15 minutes. Use {WORK_PROFILES[kind]} for this job: other profiles lack the leads protocol and Hermes stops their card at once.</p>
+        {finished > 0 && <p className="small-note form-error" role="note">This lead already has {finished} finished {kind === 'research' ? 'research' : 'proposal'} run{finished === 1 ? '' : 's'}. A new run uses tokens again.</p>}
       </>}
     </form>}
     <form onSubmit={submitNote}>

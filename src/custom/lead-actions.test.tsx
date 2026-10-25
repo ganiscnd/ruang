@@ -45,4 +45,10 @@ describe('lead actions panel', () => {
     expect(proposal).toContain('<option value="proposal-writer" selected="">proposal-writer</option>')
     expect(proposal).toContain('Use proposal-writer for this job')
   })
+
+  it('warns when the selected job already finished on this lead', () => {
+    const workCards = [{ id: 't_w1', title: '[lead t_a] Research: x', status: 'done', assignee: 'lead-researcher' }]
+    expect(render(snapshot({ stage: 'Found', workCards }))).toContain('This lead already has 1 finished research run. A new run uses tokens again.')
+    expect(render(snapshot({ stage: 'Researched', workCards }))).not.toContain('finished proposal')
+  })
 })

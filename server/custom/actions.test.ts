@@ -99,10 +99,10 @@ describe('allowlisted commands', () => {
   it('assigns a work card to a known profile and links it as the lead\'s parent', () => {
     const built = plan('lead.assign', { id: 't_aa11', profile: 'leadengineer', kind: 'research' }, context())
     const [create, link] = built.steps.map((step) => step.args)
-    expect(create.slice(0, 7)).toEqual(['kanban', '--board=leads', 'create', '--assignee=leadengineer', '--skill=leads-protocol', '--max-runtime=15m', '--max-retries=1'])
+    expect(create.slice(0, 8)).toEqual(['kanban', '--board=leads', 'create', '--assignee=leadengineer', '--skill=leads-protocol', '--skill=freelancer-facts', '--max-runtime=15m', '--max-retries=1'])
     expect(create.slice(-2)).toEqual(['--', '[lead t_aa11] Research: Lead t_aa11'])
     expect(built.summary.join(' ')).toContain('leadengineer is not the dedicated lead-researcher profile')
-    expect(built.steps[0].display).toMatch(/^hermes kanban --board=leads create --assignee=leadengineer --skill=leads-protocol --max-runtime=15m --max-retries=1 <--body: \d+ chars>/)
+    expect(built.steps[0].display).toMatch(/^hermes kanban --board=leads create --assignee=leadengineer --skill=leads-protocol --skill=freelancer-facts --max-runtime=15m --max-retries=1 <--body: \d+ chars>/)
     expect(create.find((arg) => arg.startsWith('--body='))).toMatch(/^--body=lead: t_aa11\njob: research\n/)
     expect(link).toEqual(['kanban', '--board=leads', 'link', '--', '\u0000created', 't_aa11'])
     expect(() => plan('lead.assign', { id: 't_aa11', profile: 'nobody', kind: 'research' }, context())).toThrow('Hermes profiles')
@@ -111,6 +111,14 @@ describe('allowlisted commands', () => {
     const busy = pipeline([lead('t_aa11', { workCards: [{ id: 't_w1', title: '[lead t_aa11] Research: x', status: 'ready', assignee: 'default' }] })])
     expect(() => plan('lead.assign', { id: 't_aa11', profile: 'default', kind: 'research' }, context(busy))).toThrow('already has an open research card')
     expect(plan('lead.assign', { id: 't_aa11', profile: 'default', kind: 'proposal' }, context(busy)).steps).toHaveLength(2)
+    expect(built.summary.join(' ')).not.toContain('finished')
+  })
+
+  it('warns before paying again for a job that already finished on this lead', () => {
+    const done = (id: string, kind: string) => ({ id, title: `[lead t_aa11] ${kind}: x`, status: 'done', assignee: 'lead-researcher' })
+    const data = pipeline([lead('t_aa11', { workCards: [done('t_w1', 'Research'), done('t_w2', 'Research'), done('t_w3', 'Draft proposal')] })])
+    expect(plan('lead.assign', { id: 't_aa11', profile: 'lead-researcher', kind: 'research' }, context(data)).summary).toContain('Warning: this lead already has 2 finished research runs. A new run uses tokens again.')
+    expect(plan('lead.assign', { id: 't_aa11', profile: 'proposal-writer', kind: 'proposal' }, context(data)).summary).toContain('Warning: this lead already has 1 finished draft proposal run. A new run uses tokens again.')
   })
 
   it('loads the protocol and facts skills for a proposal on the dedicated profile, with the cost caps', () => {
