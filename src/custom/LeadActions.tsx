@@ -6,6 +6,9 @@ import type { ActionName } from './write-actions.ts'
 
 const CLOSING: readonly Stage[] = ['Won', 'Lost']
 const OPEN_WORK = new Set(['triage', 'todo', 'ready', 'running', 'blocked', 'review', 'scheduled'])
+type WorkKind = 'research' | 'proposal'
+/** The dedicated Hermes profiles (see server/custom/actions.ts WORK_PROFILES). */
+const WORK_PROFILES: Record<WorkKind, string> = { research: 'lead-researcher', proposal: 'proposal-writer' }
 
 export interface LeadActionProps {
   detail: LeadDetailSnapshot
@@ -21,8 +24,11 @@ export function LeadActions({ detail, start, busy, error, message }: LeadActionP
   const [stage, setStage] = useState<Stage>(STAGES[nextIndex])
   const [reason, setReason] = useState('')
   const [note, setNote] = useState('')
-  const [agent, setAgent] = useState(detail.agents[0] ?? '')
-  const [kind, setKind] = useState<'research' | 'proposal'>(lead.stage === 'Researched' ? 'proposal' : 'research')
+  const initialKind: WorkKind = lead.stage === 'Researched' ? 'proposal' : 'research'
+  const preferred = (job: WorkKind) => (detail.agents.includes(WORK_PROFILES[job]) ? WORK_PROFILES[job] : detail.agents[0] ?? '')
+  const [kind, setKind] = useState<WorkKind>(initialKind)
+  const [agent, setAgent] = useState(preferred(initialKind))
+  const changeKind = (job: WorkKind) => { setKind(job); setAgent(preferred(job)) }
   const off = writes.enabled ? undefined : writes.reason ?? 'Write actions are not available.'
   const closed = lead.status === 'done'
   const openWork = lead.workCards.filter((card) => OPEN_WORK.has(card.status))
@@ -51,15 +57,15 @@ export function LeadActions({ detail, start, busy, error, message }: LeadActionP
       {detail.agents.length === 0 ? <p className="small-note muted">No Hermes profiles could be read, so no agent can be assigned right now.</p> : <>
         <div className="code-input-row">
           <select id="lead-agent" className="text-input" value={agent} onChange={(event) => setAgent(event.target.value)} disabled={Boolean(off)} aria-label="Agent">{detail.agents.map((name) => <option key={name} value={name}>{name}</option>)}</select>
-          <select className="text-input" value={kind} onChange={(event) => setKind(event.target.value as 'research' | 'proposal')} disabled={Boolean(off)} aria-label="Job"><option value="research">Research the lead</option><option value="proposal">Draft a proposal</option></select>
+          <select className="text-input" value={kind} onChange={(event) => changeKind(event.target.value as WorkKind)} disabled={Boolean(off)} aria-label="Job"><option value="research">Research the lead</option><option value="proposal">Draft a proposal</option></select>
           <button type="submit" className="primary-button" disabled={Boolean(off) || busy || !agent}>Assign to agent…</button>
         </div>
-        <p className="small-note muted">Creates a separate work card for the agent, linked to this lead. The agent starts within about a minute and uses tokens. The lead card itself is never assigned.</p>
+        <p className="small-note muted">Creates a separate work card for the agent, linked to this lead. The agent starts within about a minute and uses tokens. The lead card itself is never assigned. One attempt only, at most 15 minutes. Use {WORK_PROFILES[kind]} for this job: other profiles lack the leads protocol and Hermes stops their card at once.</p>
       </>}
     </form>}
     <form onSubmit={submitNote}>
       <label className="field-label" htmlFor="lead-note">Add a note</label>
-      <textarea id="lead-note" className="text-input" rows={3} value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} disabled={Boolean(off)}/>
+      <textarea id="lead-note" className="text-input" rows={3} value={note} onChange={(event) => setNote(event.target.value)} maxLength={6000} disabled={Boolean(off)}/>
       <button type="submit" className="primary-button" disabled={Boolean(off) || busy || !note.trim()}>Add note…</button>
     </form>
   </section>

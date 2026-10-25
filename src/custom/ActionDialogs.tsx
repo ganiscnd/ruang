@@ -72,7 +72,7 @@ export function AddLeadDialog({ onClose, onPreview, error, busy }: { onClose: ()
       <label className="field-label" htmlFor="lead-tags">Tags (comma separated: a-z, 0-9, -)</label>
       <input id="lead-tags" className="text-input" placeholder="n8n, procore, rag" value={form.tags} onChange={set('tags')}/>
       <label className="field-label" htmlFor="lead-notes">Notes</label>
-      <textarea id="lead-notes" className="text-input" rows={5} value={form.notes} onChange={set('notes')} maxLength={4000}/>
+      <textarea id="lead-notes" className="text-input" rows={5} value={form.notes} onChange={set('notes')} maxLength={6000}/>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="access-actions"><button type="submit" className="primary-button" disabled={busy}>{busy ? 'Checking…' : 'Review and confirm'}</button><button type="button" className="refresh-button" onClick={onClose}>CANCEL</button></div>
     </form>

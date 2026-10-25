@@ -18,6 +18,12 @@ export const ACTIONS = ['board.setup', 'lead.create', 'lead.stage', 'lead.note',
 export type ActionName = typeof ACTIONS[number]
 export const WORK_KINDS = { research: 'Research', proposal: 'Draft proposal' } as const
 export type WorkKind = keyof typeof WORK_KINDS
+/** Skills Hermes force-loads into the worker (`--skill`). A profile that has none of them refuses the run. */
+export const WORK_SKILLS: Record<WorkKind, readonly string[]> = { research: ['leads-protocol'], proposal: ['leads-protocol', 'freelancer-facts'] }
+/** The dedicated Hermes profile for each job, preselected in the UI. */
+export const WORK_PROFILES: Record<WorkKind, string> = { research: 'lead-researcher', proposal: 'proposal-writer' }
+/** Cost caps per work card: one attempt only (a failure or timeout blocks the card), at most 15 minutes. */
+export const WORK_LIMITS = ['--max-runtime=15m', '--max-retries=1'] as const
 
 export const TOKEN_TTL_MS = 2 * 60_000
 export const WRITE_TIMEOUT_MS = 20_000
@@ -55,9 +61,9 @@ function requireBoard(context: ActionContext): void {
 
 function workBody(lead: { id: string; title: string; fields: LeadFields }, kind: WorkKind): string {
   const job = kind === 'research'
-    ? ['Job: research this lead.', '1. Read the lead card with kanban_show(task_id="' + lead.id + '").', '2. Comment your findings on the LEAD card; the first line must be exactly: stage: Researched', '3. Finish this work card with kanban_complete(summary="<short findings>").']
-    : ['Job: draft a proposal for this lead.', '1. Read the lead card with kanban_show(task_id="' + lead.id + '").', '2. Put the full draft in kanban_complete(summary="<draft>") on THIS work card.', '3. Comment on the LEAD card; the first line must be exactly: stage: Proposal Drafted', 'Never send anything to Upwork or the client.']
-  return [`lead: ${lead.id}`, `job: ${kind}`, '', ...job, '', 'Rules: never assign, block, archive or complete the lead card; you may only set the stages Found, Researched and Proposal Drafted; no secrets; say "unknown" instead of guessing. Protocol: docs/LEADS_PROTOCOL.md in the Ruang repo.', '', `Lead "${lead.title}" at assignment time:`, formatLeadBody(lead.fields)].join('\n')
+    ? ['Job: research this lead.', '1. Read the lead card with kanban_show(task_id="' + lead.id + '"), including every comment (the owner may have pasted the job post there).', '2. Try web_extract on the Upwork URL once; if it is blocked, write "Not Available" and continue. Never log in.', '3. Comment your findings on the LEAD card; the first line must be exactly: stage: Researched', '4. Finish this work card with kanban_complete(summary="<short findings>").']
+    : ['Job: draft a proposal for this lead.', '1. Read the lead card with kanban_show(task_id="' + lead.id + '"), including every comment.', '2. Facts about the freelancer only from the freelancer-facts skill; write [MISSING: ...] for anything not there.', '3. Put the full draft in kanban_complete(summary="<draft>") on THIS work card.', '4. Comment on the LEAD card; the first line must be exactly: stage: Proposal Drafted', 'Never send anything to Upwork or the client.']
+  return [`lead: ${lead.id}`, `job: ${kind}`, '', ...job, '', 'Rules: follow the leads-protocol skill. Never assign, block, archive or complete the lead card; you may only set the stages Researched and Proposal Drafted; finish with kanban_complete, never a review request; create or link no cards; no secrets; say "unknown" instead of guessing.', '', `Lead "${lead.title}" at assignment time:`, formatLeadBody(lead.fields)].join('\n')
 }
 
 /** Validates one request and builds its exact commands. Throws ValidationError / ActionError. */
@@ -135,14 +141,22 @@ export function plan(action: unknown, raw: unknown, context: ActionContext): Pla
       const title = `${prefix} ${lead.title.slice(0, 120)}`
       const body = workBody(lead, kind)
       const key = `ruang-work-${lead.id}-${kind}-${sha(`${profile}|${lead.workCards.length}`).slice(0, 8)}`
-      const create = ['kanban', BOARD, 'create', `--assignee=${profile}`, `--body=${body}`, `--created-by=${OWNER}`, `--idempotency-key=${key}`, '--json', '--', title]
+      const skills = WORK_SKILLS[kind].map((skill) => `--skill=${skill}`)
+      const options = [`--assignee=${profile}`, ...skills, ...WORK_LIMITS]
+      const create = ['kanban', BOARD, 'create', ...options, `--body=${body}`, `--created-by=${OWNER}`, `--idempotency-key=${key}`, '--json', '--', title]
       const link = ['kanban', BOARD, 'link', '--', CREATED, lead.id]
       return {
         action: 'lead.assign',
         leadId: lead.id,
-        summary: [`Create a "${WORK_KINDS[kind]}" work card for "${lead.title}", assigned to ${profile}.`, `${profile} starts working on it within about a minute (the Hermes gateway runs it).`, 'Link it to the lead card so the lead shows it.'],
+        summary: [
+          `Create a "${WORK_KINDS[kind]}" work card for "${lead.title}", assigned to ${profile}.`,
+          `${profile} starts working on it within about a minute (the Hermes gateway runs it) and uses tokens.`,
+          `Limits: one attempt only (a failure or timeout blocks the card), at most 15 minutes. Skills loaded: ${WORK_SKILLS[kind].join(', ')}.`,
+          ...(profile === WORK_PROFILES[kind] ? [] : [`${profile} is not the dedicated ${WORK_PROFILES[kind]} profile: if it lacks these skills, Hermes stops the card at once.`]),
+          'Link it to the lead card so the lead shows it.',
+        ],
         steps: [
-          { args: create, display: `hermes kanban ${BOARD} create --assignee=${profile} ${chars('--body', body)} --created-by=${OWNER} --idempotency-key=${key} --json -- ${chars('title', title)}`, captureId: true },
+          { args: create, display: `hermes kanban ${BOARD} create ${options.join(' ')} ${chars('--body', body)} --created-by=${OWNER} --idempotency-key=${key} --json -- ${chars('title', title)}`, captureId: true },
           { args: link, display: `hermes kanban ${BOARD} link -- <new card> ${lead.id}` },
         ],
       }

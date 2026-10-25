@@ -5,7 +5,7 @@ import { isValidDate, MAX_TAGS, parseBudget, STAGES, TAG, UPWORK_URL, type Budge
 
 export class ValidationError extends Error {}
 
-export const LIMITS = { title: 150, client: 120, notes: 4000, comment: 2000, reason: 500, url: 300 } as const
+export const LIMITS = { title: 150, client: 120, notes: 6000, comment: 6000, reason: 500, url: 300 } as const
 
 type Params = Record<string, unknown>
 

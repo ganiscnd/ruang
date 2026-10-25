@@ -12,7 +12,7 @@ import { leadInput, ValidationError } from './validate.js'
 
 const lead = (id: string, extra: Partial<LeadDetail> = {}): LeadDetail => ({ id, title: `Lead ${id}`, status: 'ready', fields: { client: 'Northline', upworkUrl: `https://www.upwork.com/jobs/~01${id.replace(/\W/g, '')}`, tags: [], notes: '' }, hasBlock: true, stage: 'Found', historyAvailable: true, workCards: [], stageHistory: [], comments: [], ...extra })
 const pipeline = (leads: LeadDetail[] = [lead('t_aa11')], exists: boolean | 'unknown' = true): PipelineData => ({ board: { slug: 'leads', exists, availability: 'available' }, leads, omitted: 0, fetchedAt: '2026-10-24T10:00:00.000Z' })
-const context = (data = pipeline()): ActionContext => ({ pipeline: data, profiles: ['default', 'leadengineer'], today: '2026-10-24' })
+const context = (data = pipeline()): ActionContext => ({ pipeline: data, profiles: ['default', 'leadengineer', 'lead-researcher', 'proposal-writer'], today: '2026-10-24' })
 const NEW_LEAD = { title: 'Automate RFI routing', client: 'Northline Builders LLC', budgetType: 'hourly', budgetMin: '45', budgetMax: '65', upworkUrl: 'https://www.upwork.com/jobs/~01a2b3c4', posted: '2026-10-23', fit: 4, tags: 'n8n, Procore', notes: 'Line one\nLine two' }
 
 describe('write input validation', () => {
@@ -35,7 +35,7 @@ describe('write input validation', () => {
     [{ ...NEW_LEAD, budgetMin: '-5' }, 'number'],
     [{ ...NEW_LEAD, budgetMax: '10' }, 'lower than'],
     [{ ...NEW_LEAD, tags: 'ok, --assignee=x' }, 'may only use'],
-    [{ ...NEW_LEAD, notes: 'x'.repeat(4001) }, 'at most 4000'],
+    [{ ...NEW_LEAD, notes: 'x'.repeat(6001) }, 'at most 6000'],
     [{ ...NEW_LEAD, assignee: 'default' }, 'Unknown field: assignee'],
   ])('refuses bad input %#', (input, message) => {
     expect(() => leadInput(input, '2026-10-24')).toThrow(message)
@@ -99,8 +99,10 @@ describe('allowlisted commands', () => {
   it('assigns a work card to a known profile and links it as the lead\'s parent', () => {
     const built = plan('lead.assign', { id: 't_aa11', profile: 'leadengineer', kind: 'research' }, context())
     const [create, link] = built.steps.map((step) => step.args)
-    expect(create).toContain('--assignee=leadengineer')
+    expect(create.slice(0, 7)).toEqual(['kanban', '--board=leads', 'create', '--assignee=leadengineer', '--skill=leads-protocol', '--max-runtime=15m', '--max-retries=1'])
     expect(create.slice(-2)).toEqual(['--', '[lead t_aa11] Research: Lead t_aa11'])
+    expect(built.summary.join(' ')).toContain('leadengineer is not the dedicated lead-researcher profile')
+    expect(built.steps[0].display).toMatch(/^hermes kanban --board=leads create --assignee=leadengineer --skill=leads-protocol --max-runtime=15m --max-retries=1 <--body: \d+ chars>/)
     expect(create.find((arg) => arg.startsWith('--body='))).toMatch(/^--body=lead: t_aa11\njob: research\n/)
     expect(link).toEqual(['kanban', '--board=leads', 'link', '--', '\u0000created', 't_aa11'])
     expect(() => plan('lead.assign', { id: 't_aa11', profile: 'nobody', kind: 'research' }, context())).toThrow('Hermes profiles')
@@ -109,6 +111,15 @@ describe('allowlisted commands', () => {
     const busy = pipeline([lead('t_aa11', { workCards: [{ id: 't_w1', title: '[lead t_aa11] Research: x', status: 'ready', assignee: 'default' }] })])
     expect(() => plan('lead.assign', { id: 't_aa11', profile: 'default', kind: 'research' }, context(busy))).toThrow('already has an open research card')
     expect(plan('lead.assign', { id: 't_aa11', profile: 'default', kind: 'proposal' }, context(busy)).steps).toHaveLength(2)
+  })
+
+  it('loads the protocol and facts skills for a proposal on the dedicated profile, with the cost caps', () => {
+    const built = plan('lead.assign', { id: 't_aa11', profile: 'proposal-writer', kind: 'proposal' }, context())
+    const create = built.steps[0].args
+    expect(create.slice(0, create.findIndex((arg) => arg.startsWith('--body=')))).toEqual(['kanban', '--board=leads', 'create', '--assignee=proposal-writer', '--skill=leads-protocol', '--skill=freelancer-facts', '--max-runtime=15m', '--max-retries=1'])
+    expect(create.slice(-2)).toEqual(['--', '[lead t_aa11] Draft proposal: Lead t_aa11'])
+    expect(built.summary.join(' ')).not.toContain('not the dedicated')
+    expect(built.summary.join(' ')).toContain('one attempt only')
   })
 
   it('refuses unknown actions and extra fields', () => {

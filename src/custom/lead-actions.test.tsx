@@ -37,4 +37,12 @@ describe('lead actions panel', () => {
     expect(render(snapshot({ status: 'done', stage: 'Won' }))).not.toContain('Assign to agent')
     expect(render({ ...snapshot(), agents: [] })).toContain('No Hermes profiles could be read')
   })
+
+  it('preselects the dedicated profile for the job when it exists', () => {
+    const agents = ['default', 'lead-researcher', 'proposal-writer']
+    expect(render({ ...snapshot({ stage: 'Found' }), agents })).toContain('<option value="lead-researcher" selected="">lead-researcher</option>')
+    const proposal = render({ ...snapshot({ stage: 'Researched' }), agents })
+    expect(proposal).toContain('<option value="proposal-writer" selected="">proposal-writer</option>')
+    expect(proposal).toContain('Use proposal-writer for this job')
+  })
 })
