@@ -7,5 +7,5 @@
     "outDir": "build/server"
   },
   "include": ["server"],
-  "exclude": ["server/**/*.test.ts"]
+  "exclude": ["server/**/*.test.ts", "server/**/*.fixture.ts"]
 }
