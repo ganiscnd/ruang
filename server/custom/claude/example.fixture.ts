@@ -11,7 +11,7 @@ export function exampleConfig(): Record<string, unknown> {
         agents: [{ code: 'ZZ.1.A', name: 'Example writer', schedule: 'daily 06:00', runsOnMac: true, boards: ['example-drafts'] }],
         boards: [{
           id: 'example-drafts', title: 'Drafts', spreadsheetId: 'example-sheet-id-000000001', tab: 'Drafts', rowKey: ['postDate', 'topic'],
-          columns: { postDate: { col: 'A', header: 'Post date' }, topic: { col: 'B', header: 'Topic', role: 'title' }, status: { col: 'C', header: 'Status', role: 'status' }, ganiNotes: { col: 'D', header: 'Gani notes', role: 'ganiNotes' } },
+          columns: { postDate: { col: 'A', header: 'Post date' }, topic: { col: 'B', header: 'Topic', role: 'title' }, status: { col: 'C', header: 'Status', role: 'status' }, ganiNotes: { col: 'D', header: 'Owner notes', role: 'ganiNotes' } },
           needsYou: { status: ['Drafted'], reason: 'Check the draft' }, ganiCanSetStatus: ['Posted', 'Skipped'], writableColumns: ['status', 'ganiNotes'], files: { root: 'Example Drafts' },
         }],
       },

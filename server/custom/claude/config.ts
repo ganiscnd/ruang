@@ -36,7 +36,7 @@ export interface BoardConfig {
 }
 export interface AgentConfig { code: string; name: string; schedule: string; runsOnMac: boolean; notifierOnly: boolean; boards: string[] }
 export interface TeamConfig { code: string; slug: string; name: string; status: 'active' | 'paused'; agents: AgentConfig[]; boards: BoardConfig[] }
-export interface ClaudeConfig { timezone: string; keyFile: string; icloudRoot?: string; teams: TeamConfig[]; testBoards: BoardConfig[] }
+export interface ClaudeConfig { timezone: string; ownerName: string; keyFile: string; icloudRoot?: string; teams: TeamConfig[]; testBoards: BoardConfig[] }
 
 export class ClaudeConfigError extends Error {}
 
@@ -172,6 +172,8 @@ export function parseClaudeConfig(value: unknown): ClaudeConfig {
   if (raw.version !== 1) throw new ClaudeConfigError('Unsupported config version (expected 1).')
   const timezone = raw.timezone === undefined ? 'Asia/Jakarta' : text(raw.timezone, 'timezone')
   try { new Intl.DateTimeFormat('en-US', { timeZone: timezone }) } catch { throw new ClaudeConfigError(`Unknown timezone "${timezone}".`) }
+  // The owner's name as the sheets use it (the heading of its notes blocks); neutral when not configured.
+  const ownerName = raw.ownerName === undefined ? 'Owner' : text(raw.ownerName, 'ownerName', /^[\p{L}][\p{L} .'-]{0,39}$/u)
   const keyFile = text(raw.serviceAccountKeyFile, 'serviceAccountKeyFile')
   if (!path.isAbsolute(keyFile)) throw new ClaudeConfigError('serviceAccountKeyFile must be an absolute path.')
   let icloudRoot: string | undefined
@@ -219,7 +221,7 @@ export function parseClaudeConfig(value: unknown): ClaudeConfig {
       testCopyOf: of,
     })
   })
-  return { timezone, keyFile, ...(icloudRoot ? { icloudRoot } : {}), teams, testBoards }
+  return { timezone, ownerName, keyFile, ...(icloudRoot ? { icloudRoot } : {}), teams, testBoards }
 }
 
 export async function loadClaudeConfig(file = claudeConfigPath()): Promise<ClaudeConfig> {

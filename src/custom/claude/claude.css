@@ -1,0 +1,39 @@
+/* custom: Claude section. Coral accent keeps Claude teams apart from the Hermes agents. */
+:root { --claude-accent: #d97757; }
+.nav-group { color: var(--text-muted, #778078); font: 10px ui-monospace, monospace; letter-spacing: .12em; margin: 14px 0 2px; padding: 0 12px; text-transform: uppercase; }
+.nav-tag { color: var(--text-muted, #778078); font: 9px ui-monospace, monospace; letter-spacing: .06em; }
+.claude-badge { background: var(--claude-accent); color: #1b120d; }
+.claude-code { color: var(--claude-accent); font: 12px ui-monospace, monospace; }
+.claude-team-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 24px; }
+.claude-team-card { border: 1px solid var(--c-313831); border-top: 3px solid var(--claude-accent); display: grid; gap: 14px; padding: 20px; }
+.claude-team-card.paused { border-top-color: var(--c-778078); opacity: .85; }
+.claude-team-card header { align-items: center; border: 0; display: flex; flex-wrap: wrap; gap: 8px; padding: 0; }
+.claude-team-card h2 { flex: 1; font-size: 20px; font-weight: 500; letter-spacing: -.03em; margin: 0; }
+.claude-needs { display: grid; }
+.claude-needs strong { color: var(--claude-accent); font-size: 52px; line-height: 1; }
+.claude-needs span { color: var(--c-778078); font: 11px ui-monospace, monospace; letter-spacing: .07em; }
+.claude-facts { display: grid; gap: 6px 12px; grid-template-columns: auto 1fr; }
+.claude-facts div { display: contents; }
+.claude-facts dd { font-size: 13px; }
+.claude-open { justify-self: start; text-decoration: none; }
+.claude-agents { border-top: 1px solid var(--c-313831); display: grid; margin: 18px 0; }
+.claude-agents article { align-items: baseline; border-bottom: 1px solid var(--c-313831); display: grid; gap: 4px 12px; grid-template-columns: 70px minmax(140px, 1.2fr) auto minmax(160px, 2fr) auto; padding: 10px 0; }
+.claude-agents small { grid-column: 2 / -1; }
+.claude-agent-detail { color: var(--c-9ea79e); font-size: 13px; }
+.claude-agent-next { font: 12px ui-monospace, monospace; }
+.claude-board { margin-top: 14px; }
+.claude-board-meta { align-items: center; color: var(--c-778078); display: flex; flex-wrap: wrap; font: 11px ui-monospace, monospace; gap: 10px; letter-spacing: .05em; }
+.claude-needs-panel { border: 1px solid var(--claude-accent); margin: 14px 0 20px; padding: 16px 18px; }
+.claude-needs-panel h2 { font-size: 18px; font-weight: 500; margin: 0 0 8px; }
+.claude-needs-panel ol { display: grid; gap: 8px; margin: 0; padding-left: 22px; }
+.claude-group { border-top: 1px solid var(--c-313831); padding: 10px 0; }
+.claude-group summary { cursor: pointer; display: flex; gap: 8px; align-items: center; }
+.claude-table { border-collapse: collapse; margin-top: 8px; width: 100%; }
+.claude-table th { color: var(--c-778078); font: 10px ui-monospace, monospace; letter-spacing: .07em; padding: 6px 8px; text-align: left; text-transform: uppercase; }
+.claude-table td { border-top: 1px solid var(--c-313831); font-size: 13px; padding: 7px 8px; vertical-align: top; }
+.claude-key { font-family: ui-monospace, monospace; white-space: nowrap; }
+@media (max-width: 760px) {
+  .claude-agents article { grid-template-columns: 70px 1fr; }
+  .claude-agents article > * { grid-column: 2; }
+  .claude-agents article > .claude-code { grid-column: 1; grid-row: 1 / span 3; }
+}

@@ -83,6 +83,6 @@ describe('header check', () => {
 
   it('reads the whole board in one quoted range', () => {
     expect(boardRange(lab)).toBe("'Tasks'!A1:AA")
-    expect(boardRange({ ...lab, tab: "Gani's ideas" })).toBe("'Gani''s ideas'!A1:AA")
+    expect(boardRange({ ...lab, tab: "Owner's ideas" })).toBe("'Owner''s ideas'!A1:AA")
   })
 })

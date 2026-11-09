@@ -120,7 +120,7 @@ describe('access check', () => {
     const sheets: SheetsApi = {
       async batchGet(id) {
         if (id === 'example-sheet-id-000000003') throw new SheetsError('The spreadsheet is not shared with the service account, or the Google Sheets API is not enabled.', 'not-shared')
-        if (id === 'example-sheet-id-000000001') return [[['Post date', 'Topic', 'Status', 'Gani notes'], ['2026-11-09', 'Secret topic text', 'Drafted', 'Private note']]]
+        if (id === 'example-sheet-id-000000001') return [[['Post date', 'Topic', 'Status', 'Owner notes'], ['2026-11-09', 'Secret topic text', 'Drafted', 'Private note']]]
         return [[['ID', 'Owner', 'Depends on', 'Status', 'Notified'], ['T01', 'ZZ.3.A', '', 'review', ''], ['T02', 'Someone', 'T01', 'waiting', '']]]
       },
     }

@@ -12,13 +12,16 @@ import { Usage } from './pages/Usage.tsx'
 import { TaskBoard } from './pages/TaskBoard.tsx'
 // custom: freelance Mission Control pages (src/custom).
 import { Pipeline } from './custom/pages/Pipeline.tsx'
+import { Claude } from './custom/claude/pages/Claude.tsx'
+import { ClaudeNav } from './custom/claude/ClaudeNav.tsx'
+import { teamFromHash } from './custom/claude/claude-view.ts'
 import { LOCKED_EVENT, loadAccess, type AccessStatus } from './access.ts'
 import { PROFILES_CHANGED } from './profile-lock.ts'
 import { LockScreen } from './LockScreen.tsx'
 import { API_VERSION } from './api-version.ts'
 import { RefreshContext, usePolling } from './polling.ts'
 import { usePreferences } from './preferences.ts'
-import { HOME, navigation, pageFromHash, pageSlug, type Page } from './routes.ts'
+import { HOME, hermesNavigation, pageFromHash, pageSlug, type Page } from './routes.ts'
 import type { DashboardSnapshot } from './types.ts'
 
 function currentPage(): Page {
@@ -27,6 +30,8 @@ function currentPage(): Page {
 
 function Shell({ onRefresh, access, onAccessChange }: { onRefresh: () => void; access: AccessStatus | undefined; onAccessChange: (status: AccessStatus) => void }) {
   const [page, setPage] = useState<Page>(currentPage)
+  // custom: the Claude team shown (#/claude/<team>), for the sidebar's active entry.
+  const [claudeTeam, setClaudeTeam] = useState(() => (typeof window === 'undefined' ? undefined : teamFromHash(window.location.hash)))
   const { theme, toggleTheme } = usePreferences()
   // The navigation is a drawer over the page, closed by default, like a game's menu.
   const [menuOpen, setMenuOpen] = useState(false)
@@ -41,7 +46,7 @@ function Shell({ onRefresh, access, onAccessChange }: { onRefresh: () => void; a
       : 'This page is older than the Ruang server. Reload the page (and run npm run build if you use npm start).'
 
   useEffect(() => {
-    const onHashChange = () => setPage(currentPage())
+    const onHashChange = () => { setPage(currentPage()); setClaudeTeam(teamFromHash(window.location.hash)) }
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
@@ -74,16 +79,25 @@ function Shell({ onRefresh, access, onAccessChange }: { onRefresh: () => void; a
     setMenuOpen(false)
     window.scrollTo?.({ top: 0 })
   }
+  // custom: Claude section links carry a sub-path (#/claude/zz-3), so they set the hash themselves.
+  const navigateHash = (hash: string) => {
+    window.location.hash = hash.replace(/^#/, '')
+    setPage(pageFromHash(hash))
+    setClaudeTeam(teamFromHash(hash))
+    setMenuOpen(false)
+    window.scrollTo?.({ top: 0 })
+  }
   const syncLabel = data ? `SYNCED ${formatTime(data.fetchedAt)}${dashboard.status === 'ready' && dashboard.stale ? ' · STALE' : ''}` : dashboard.status === 'failed' ? 'API NOT AVAILABLE' : 'CONNECTING...'
 
   const alerts = (data && data.commands.failed > 0 ? 1 : 0)
-  const content = page === 'Agents' ? <Agents runtime={data?.runtime ?? null} pending={dashboard.status === 'pending'}/> : page === 'Office' ? <Office dashboard={data} dashboardPending={dashboard.status === 'pending'} onNavigate={navigate}/> : page === 'Usage' ? <Usage/>: page === 'Pipeline' ? <Pipeline/> : page === 'Task Board' ? <TaskBoard/> : page === 'Calendar' ? <Calendar/> : page === 'Activity' ? <Activity/> : page === 'Memory' ? <Memory onOpenFolders={() => navigate('Folders')}/> : page === 'Folders' ? <Folders/> : page === 'Settings' ? <Settings access={access} onAccessChange={onAccessChange}/> : <Logs/>
+  const content = page === 'Agents' ? <Agents runtime={data?.runtime ?? null} pending={dashboard.status === 'pending'}/> : page === 'Office' ? <Office dashboard={data} dashboardPending={dashboard.status === 'pending'} onNavigate={navigate}/> : page === 'Usage' ? <Usage/>: page === 'Pipeline' ? <Pipeline/> : page === 'Task Board' ? <TaskBoard/> : page === 'Calendar' ? <Calendar/> : page === 'Activity' ? <Activity/> : page === 'Memory' ? <Memory onOpenFolders={() => navigate('Folders')}/> : page === 'Folders' ? <Folders/> : page === 'Settings' ? <Settings access={access} onAccessChange={onAccessChange}/> : page === 'Claude' ? <Claude/> : <Logs/>
 
   return <div className={`app${page === 'Office' ? ' app-office' : ''}`}>
     {menuOpen && <div className="drawer-backdrop" onClick={closeMenu} aria-hidden="true"/>}
     <aside id="app-sidebar" className="drawer" ref={drawer} hidden={!menuOpen} aria-label="Menu">
       <div className="drawer-head"><a className="brand" href="#/office" onClick={(event) => { event.preventDefault(); navigate(HOME) }}>RUANG<span>HERMES 3D</span></a><button type="button" className="icon-button" onClick={closeMenu} aria-label="Close menu" title="Close menu (Esc)">✕</button></div>
-      <nav aria-label="Main">{navigation.map((item) => <a href={`#/${pageSlug(item)}`} className={page === item ? 'active' : ''} aria-current={page === item ? 'page' : undefined} key={item} onClick={(event) => { event.preventDefault(); navigate(item) }}>{item}{item === 'Logs' && data && data.commands.failed > 0 && <span className="nav-badge" title="Failed CLI reads">{data.commands.failed}</span>}</a>)}</nav>
+      {/* custom: two groups, Hermes (the stock pages + Pipeline) and Claude (src/custom/claude). */}
+      <nav aria-label="Main"><p className="nav-group">Hermes</p>{hermesNavigation.map((item) => <a href={`#/${pageSlug(item)}`} className={page === item ? 'active' : ''} aria-current={page === item ? 'page' : undefined} key={item} onClick={(event) => { event.preventDefault(); navigate(item) }}>{item}{item === 'Logs' && data && data.commands.failed > 0 && <span className="nav-badge" title="Failed CLI reads">{data.commands.failed}</span>}</a>)}<ClaudeNav active={page === 'Claude'} current={claudeTeam} onNavigate={navigateHash}/></nav>
       {/* custom: writes exist only as confirmed, allowlisted actions (src/custom). */}<div className="sidebar-note"><span className="dot"/> READ-ONLY + APPROVED ACTIONS</div>
       <small className="drawer-hint">Press M to open or close this menu</small>
     </aside>

@@ -5,6 +5,8 @@ import { cachedSource, clearTaskBoardCache, getSnapshot, TASK_ID } from '../miss
 import { PRIVATE_TASK } from '../privacy.js'
 import { isHidden, type Privacy } from '../profile-lock.js'
 import { ActionError, WriteActions, type ActionContext } from './actions.js'
+import { installClaude } from './claude/routes.js'
+import type { ClaudeData } from './claude/teams.js'
 import { collectPipeline, type LeadDetail, type PipelineData } from './pipeline.js'
 import { ValidationError } from './validate.js'
 
@@ -63,6 +65,8 @@ export interface CustomOptions {
   profiles?: () => Promise<string[]>
   /** Called after every executed write, so cached reads show it at once. */
   afterWrite?: () => void
+  /** The Claude section's data (server/custom/claude); tests pass a fake. */
+  claudeSource?: (now: number) => Promise<ClaudeData>
 }
 
 const today = () => new Date().toLocaleDateString('en-CA')
@@ -73,6 +77,7 @@ export function installCustom(app: Express, options: CustomOptions): void {
   const profiles = options.profiles ?? (async () => { const runtime = await getSnapshot(); return runtime.profiles.availability === 'available' ? runtime.profiles.data.map((profile) => profile.name) : [] })
   const afterWrite = options.afterWrite ?? (() => { pipelineSource.clear(); clearTaskBoardCache() })
   const now = (request: Request) => Date.now() + (request.query.fresh === '1' ? FRESH_WINDOW_MS : 0)
+  installClaude(app, { ...(options.claudeSource ? { source: options.claudeSource } : {}) })
 
   app.get('/api/custom/pipeline', async (request, response) => {
     const [data, privacy, access] = await Promise.all([source(now(request)), options.privacyOf(request), options.accessOf(request)])
