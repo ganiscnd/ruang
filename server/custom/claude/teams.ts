@@ -6,12 +6,13 @@ import { cellOf, knownStatuses, TASKFLOW, readBoard, rowKeyText, rowTitle, statu
 import { loadClaudeConfig, type AgentConfig, type BoardConfig, type ClaudeConfig, type TeamConfig } from './config.js'
 import { cachedProbe, PROBE_TIMEOUT_MS, type Probe } from './probe.js'
 import { localDate, nextRun, type NextRun } from './schedule.js'
+import { computeFlow, type NeedsItem, type Queue, type Relations } from './taskflow.js'
 import type { SheetsApi } from './sheets.js'
 
 export type AgentState = 'Working' | 'Waiting for you' | 'Queued' | 'Idle' | 'Ran today' | 'Not run yet today' | 'Paused' | 'Notifier' | 'Unknown'
 export interface AgentLine { code: string; name: string; state: AgentState; detail: string; nextRun: NextRun; runsOnMac: boolean; notifierOnly: boolean; provenance: string }
 
-export interface CardSummary { row: number; key: string; id?: string; title: string; status: string; statusKey: string; owner?: string; date?: string; score?: string; updated?: string }
+export interface CardSummary { row: number; key: string; id?: string; title: string; status: string; statusKey: string; owner?: string; date?: string; score?: string; updated?: string; /** Task-flow boards only. */ relations?: Relations }
 export interface FilesHealth { status: 'readable' | 'denied' | 'blocked' | 'missing' | 'error'; message: string }
 export interface BoardView {
   id: string
@@ -31,6 +32,8 @@ export interface BoardView {
   needsYouReason?: string
   /** Rows in a status the owner may never change (do-not-contact). */
   neverTouch: number[]
+  /** Task-flow boards: the ranked Needs-you list with reasons, agent queues, the open chain. */
+  flow?: { needs: NeedsItem[]; queues: Queue[]; chain: string[]; warnings: string[] }
 }
 export interface TeamSummary {
   slug: string
@@ -48,7 +51,18 @@ export interface TeamSummary {
   boards: { id: string; title: string; availability: 'available' | 'unavailable'; reason?: string; readOnly?: string; testCopy: boolean }[]
   agents: AgentLine[]
 }
-export interface ClaudeData { availability: 'available' | 'unavailable'; reason?: string; ownerName: string; timezone: string; fetchedAt: string; teams: TeamSummary[]; boards: Record<string, BoardView> }
+export interface ClaudeData {
+  availability: 'available' | 'unavailable'
+  reason?: string
+  ownerName: string
+  timezone: string
+  fetchedAt: string
+  teams: TeamSummary[]
+  boards: Record<string, BoardView>
+  /** Server only (never sent): the rows behind each board and its output folder's absolute path. */
+  reads: Record<string, BoardRead>
+  fileRoots: Record<string, string>
+}
 
 const readTime = (iso: string, timeZone: string) => new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' }).format(Date.parse(iso))
 
@@ -76,7 +90,7 @@ function compareValues(a: string | undefined, b: string | undefined): number {
   return Number.isFinite(x) && Number.isFinite(y) ? x - y : a.localeCompare(b, 'en', { numeric: true })
 }
 
-/** Needs-you rows. Table boards follow `sortBy`; task-flow boards are ranked in taskflow.ts (step 3), lowest ID first until then. */
+/** Needs-you rows of a table board, in `sortBy` order (task-flow boards are ranked in taskflow.ts). */
 function needsYouRows(board: BoardConfig, read: BoardRead, cards: CardSummary[]): number[] {
   if (!board.needsYou || read.availability !== 'available') return []
   const wanted = new Set(board.needsYou.status.map((status) => status.toLowerCase()))
@@ -87,10 +101,11 @@ function needsYouRows(board: BoardConfig, read: BoardRead, cards: CardSummary[])
     .map((card) => card.row)
 }
 
-export function boardView(read: BoardRead, files?: FilesHealth): BoardView {
+export function boardView(read: BoardRead, files?: FilesHealth, context: { today?: string; runs?: ReadonlyMap<string, NextRun> } = {}): BoardView {
   const { board } = read
   const known = knownStatuses(board)
-  const cards = read.rows.map((row) => cardOf(board, row, known))
+  const flow = board.kind === 'taskflow' && read.availability === 'available' ? computeFlow(read, { today: context.today ?? '', ...(context.runs ? { runs: context.runs } : {}) }) : undefined
+  const cards = read.rows.map((row) => ({ ...cardOf(board, row, known), ...(flow?.relations[row.row] ? { relations: flow.relations[row.row] } : {}) }))
   const never = new Set(board.neverTouchStatus.map((status) => status.toLowerCase()))
   return {
     id: board.id,
@@ -103,10 +118,11 @@ export function boardView(read: BoardRead, files?: FilesHealth): BoardView {
     ...(read.readOnly ? { readOnly: read.readOnly } : {}),
     ...(files ? { files } : {}),
     cards,
-    needsYou: needsYouRows(board, read, cards),
+    needsYou: flow ? flow.needs.map((item) => item.row) : needsYouRows(board, read, cards),
     needsYouRule: Boolean(board.needsYou),
     ...(board.needsYou?.reason ? { needsYouReason: board.needsYou.reason } : {}),
     neverTouch: cards.filter((card) => never.has(card.statusKey)).map((card) => card.row),
+    ...(flow ? { flow: { needs: flow.needs, queues: flow.queues, chain: flow.chain, warnings: flow.warnings } } : {}),
   }
 }
 
@@ -199,7 +215,7 @@ export async function collectClaude(options: { sheets: (config: ClaudeConfig) =>
   try {
     config = await loadClaudeConfig(options.configFile)
   } catch (error) {
-    return { availability: 'unavailable', reason: error instanceof Error ? error.message : 'The Claude teams config cannot be read.', ownerName: 'Owner', timezone: 'Asia/Jakarta', fetchedAt, teams: [], boards: {} }
+    return { availability: 'unavailable', reason: error instanceof Error ? error.message : 'The Claude teams config cannot be read.', ownerName: 'Owner', timezone: 'Asia/Jakarta', fetchedAt, teams: [], boards: {}, reads: {}, fileRoots: {} }
   }
   const sheets = options.sheets(config)
   const boards = [...config.teams.flatMap((team) => team.boards), ...config.testBoards]
@@ -207,6 +223,9 @@ export async function collectClaude(options: { sheets: (config: ClaudeConfig) =>
   // Sheets reads and folder checks run side by side; both are time-limited, so this always finishes.
   const reads = await Promise.all(boards.map((board) => Promise.all([readBoard(board, sheets, now), filesHealth(config, board, probe)])))
   const readMap = new Map(reads.map(([read]) => [read.board.id, read]))
-  const views = Object.fromEntries(reads.map(([read, files]) => [read.board.id, boardView(read, files)]))
-  return { availability: 'available', ownerName: config.ownerName, timezone: config.timezone, fetchedAt, teams: config.teams.map((team) => teamSummary(team, views, readMap, config, now, config.testBoards)), boards: views }
+  const today = localDate(now, config.timezone)
+  const runs = new Map(config.teams.map((team) => [team.code, new Map(team.agents.map((agent) => [agent.code, nextRun(agent, team.status === 'paused', now, config.timezone)]))]))
+  const views = Object.fromEntries(reads.map(([read, files]) => [read.board.id, boardView(read, files, { today, ...(runs.get(read.board.team) ? { runs: runs.get(read.board.team)! } : {}) })]))
+  const fileRoots = Object.fromEntries(boards.flatMap((board) => (board.files && config.icloudRoot ? [[board.id, path.join(config.icloudRoot, board.files.root)]] : [])))
+  return { availability: 'available', ownerName: config.ownerName, timezone: config.timezone, fetchedAt, teams: config.teams.map((team) => teamSummary(team, views, readMap, config, now, config.testBoards)), boards: views, reads: Object.fromEntries(readMap), fileRoots }
 }

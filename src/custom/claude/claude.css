@@ -37,3 +37,52 @@
   .claude-agents article > * { grid-column: 2; }
   .claude-agents article > .claude-code { grid-column: 1; grid-row: 1 / span 3; }
 }
+.claude-ranked { display: grid; gap: 12px; margin: 0; padding-left: 26px; }
+.claude-ranked li::marker { color: var(--claude-accent); font: 600 15px ui-monospace, monospace; }
+.claude-ranked p { color: var(--c-cbd1c9); font-size: 13px; margin: 3px 0 0; }
+.claude-chain { border-top: 1px solid var(--c-313831); font: 13px ui-monospace, monospace; margin: 14px 0 0; padding-top: 10px; }
+.claude-chain .eyebrow { display: block; margin-bottom: 4px; }
+.claude-queues { display: grid; gap: 4px; font-size: 13px; margin: 0 0 14px; }
+.claude-queues p { margin: 0; }
+.claude-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
+.claude-filter button { background: transparent; border: 1px solid var(--c-313831); border-radius: 12px; color: inherit; cursor: pointer; font: 11px ui-monospace, monospace; padding: 4px 10px; }
+.claude-filter button.active { border-color: var(--claude-accent); color: var(--claude-accent); }
+.claude-columns { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.claude-column { align-content: start; background: var(--c-171c18); border: 1px solid var(--c-313831); display: grid; gap: 8px; padding: 12px; }
+.claude-column h3 { font-size: 14px; font-weight: 500; margin: 0; }
+.claude-column.column-needs { border-color: var(--claude-accent); }
+.claude-card { background: var(--c-1b211c); border: 1px solid var(--c-313831); border-radius: 4px; color: inherit; cursor: pointer; display: grid; font: inherit; gap: 5px; padding: 9px; text-align: left; }
+.claude-card:hover, .claude-card:focus-visible { border-color: var(--claude-accent); }
+.claude-card-head { align-items: center; display: flex; flex-wrap: wrap; gap: 5px; }
+.claude-card-head .badge { padding: 3px 6px; }
+.claude-card-title { font-size: 13px; }
+.claude-card small { color: var(--c-9ea79e); }
+.claude-rank { background: var(--claude-accent); border-radius: 9px; color: #1b120d; font: 600 11px ui-monospace, monospace; min-width: 18px; padding: 1px 5px; text-align: center; }
+.claude-detail { max-width: 860px; }
+.claude-detail h2 { font-size: 24px; }
+.claude-detail-grid { display: grid; gap: 10px 18px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 14px 0; }
+.claude-field { white-space: pre-wrap; }
+.claude-section { border-top: 1px solid var(--c-313831); margin-top: 14px; padding-top: 12px; }
+.claude-section h3 { font-size: 16px; font-weight: 500; margin: 0 0 8px; }
+.claude-section summary { cursor: pointer; font-weight: 500; }
+.claude-pre { line-height: 1.5; white-space: pre-wrap; }
+.claude-notes h4, .claude-note-block h4 { font-size: 13px; margin: 10px 0 4px; }
+.claude-notes ul { display: grid; gap: 4px; margin: 0; padding-left: 20px; }
+.claude-recommend { color: var(--claude-accent); }
+.claude-outputs { display: grid; gap: 6px; list-style: none; margin: 0 0 8px; padding: 0; }
+.claude-outputs li { display: grid; gap: 2px; }
+.claude-output-link { margin-right: 10px; word-break: break-all; }
+.claude-output-text { color: var(--c-9ea79e); }
+.claude-note-block { border-left: 2px solid var(--claude-accent); margin: 8px 0; padding-left: 10px; }
+.claude-file { border: 1px solid var(--c-313831); margin-top: 10px; padding: 12px; }
+.claude-file header { align-items: center; border: 0; display: flex; gap: 10px; justify-content: space-between; padding: 0 0 8px; }
+.claude-file header span { display: flex; gap: 12px; }
+.claude-file-list { display: grid; gap: 4px; list-style: none; margin: 0; padding: 0; }
+.claude-file-list small { margin-left: 8px; }
+.claude-file-text { max-height: 60vh; overflow: auto; white-space: pre-wrap; }
+.claude-file-image { max-width: 100%; }
+.claude-file-pdf { border: 0; height: 70vh; width: 100%; }
+.mini-markdown { line-height: 1.5; max-height: 60vh; overflow: auto; }
+.mini-markdown h3, .mini-markdown h4, .mini-markdown h5 { margin: 14px 0 6px; }
+.mini-markdown pre { overflow: auto; }
+.mini-markdown li.nested { margin-left: 18px; }

@@ -66,8 +66,8 @@ describe('Claude overview', () => {
 describe('Claude team page', () => {
   const data = (boards: BoardView[], extra: Partial<TeamSummary> = {}): ClaudeTeamData => ({ team: team(extra), boards, ownerName: 'Owner', timezone: 'Asia/Jakarta', fetchedAt: '2026-11-09T02:15:00.000Z' })
 
-  it('shows agents with provenance, the Needs-you list and status groups', () => {
-    const markup = renderToStaticMarkup(<ClaudeTeamView team={ready(data([board()]))}/>)
+  it('shows agents with provenance, and a table board\'s Needs-you list and status groups', () => {
+    const markup = renderToStaticMarkup(<ClaudeTeamView team={ready(data([board({ kind: 'table' })]))}/>)
     expect(markup).toContain('Waiting for you')
     expect(markup).toContain('from Lab board, read 09:15')
     expect(markup).toMatch(/Needs you.*T02.*Example review task/s)
