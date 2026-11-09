@@ -1,10 +1,10 @@
 // custom: what the Claude pages show, built from the config and one read of every board. Nothing
 // here is guessed: a board that cannot be read makes its counts and agent states Unknown, and the
 // agents' states come only from what the rows say (see agentLine).
-import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { cellOf, knownStatuses, TASKFLOW, readBoard, rowKeyText, rowTitle, statusKey, type BoardRead, type BoardRow } from './board.js'
 import { loadClaudeConfig, type AgentConfig, type BoardConfig, type ClaudeConfig, type TeamConfig } from './config.js'
+import { cachedProbe, PROBE_TIMEOUT_MS, type Probe } from './probe.js'
 import { localDate, nextRun, type NextRun } from './schedule.js'
 import type { SheetsApi } from './sheets.js'
 
@@ -12,7 +12,7 @@ export type AgentState = 'Working' | 'Waiting for you' | 'Queued' | 'Idle' | 'Ra
 export interface AgentLine { code: string; name: string; state: AgentState; detail: string; nextRun: NextRun; runsOnMac: boolean; notifierOnly: boolean; provenance: string }
 
 export interface CardSummary { row: number; key: string; id?: string; title: string; status: string; statusKey: string; owner?: string; date?: string; score?: string; updated?: string }
-export interface FilesHealth { status: 'readable' | 'denied' | 'missing' | 'error'; message: string }
+export interface FilesHealth { status: 'readable' | 'denied' | 'blocked' | 'missing' | 'error'; message: string }
 export interface BoardView {
   id: string
   title: string
@@ -175,23 +175,24 @@ function teamSummary(team: TeamConfig, views: Record<string, BoardView>, reads: 
   }
 }
 
-/** Can this process read the board's output folder? macOS may block the iCloud folder for the service. */
-export async function filesHealth(config: Pick<ClaudeConfig, 'icloudRoot'>, board: BoardConfig): Promise<FilesHealth | undefined> {
+const ACCESS_HINT = 'Give node access in System Settings → Privacy & Security → Files and Folders (iCloud Drive) or Full Disk Access, then restart Ruang (scripts/deploy.sh).'
+
+/** Can Ruang read the board's output folder? Checked in a child process (probe.ts): macOS may block or hold the iCloud folder for the service. */
+export async function filesHealth(config: Pick<ClaudeConfig, 'icloudRoot'>, board: BoardConfig, probe: Probe): Promise<FilesHealth | undefined> {
   if (!board.files || board.testCopyOf) return undefined
   if (!config.icloudRoot) return { status: 'missing', message: 'No iCloud root is configured.' }
-  try {
-    if (!(await stat(path.join(config.icloudRoot, board.files.root))).isDirectory()) return { status: 'error', message: 'The output folder is not a folder.' }
-    await readdir(path.join(config.icloudRoot, board.files.root))
-    return { status: 'readable', message: 'Output folder readable.' }
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code
-    if (code === 'EPERM' || code === 'EACCES') return { status: 'denied', message: 'macOS does not let Ruang read the iCloud folder. Grant node access in System Settings → Privacy & Security → Files and Folders (or Full Disk Access).' }
-    if (code === 'ENOENT') return { status: 'missing', message: 'The output folder was not found.' }
-    return { status: 'error', message: `The output folder cannot be read (${code ?? 'unknown error'}).` }
-  }
+  const result = await probe(path.join(config.icloudRoot, board.files.root))
+  if (result.ok) return { status: 'readable', message: `Output folder readable (${result.entries} entries).` }
+  if (result.code === 'TIMEOUT') return { status: 'blocked', message: `Not Available: macOS held Ruang's access to the iCloud folder for more than ${PROBE_TIMEOUT_MS / 1000} seconds (a privacy prompt may be waiting on the Mac's screen). ${ACCESS_HINT}` }
+  if (result.code === 'EPERM' || result.code === 'EACCES') return { status: 'denied', message: `Not Available: macOS does not let Ruang read the iCloud folder. ${ACCESS_HINT}` }
+  if (result.code === 'ENOENT') return { status: 'missing', message: 'Not Available: the output folder was not found.' }
+  if (result.code === 'ENOTDIR') return { status: 'error', message: 'Not Available: the output folder is not a folder.' }
+  return { status: 'error', message: `Not Available: the output folder cannot be read (${result.code}).` }
 }
 
-export async function collectClaude(options: { sheets: (config: ClaudeConfig) => SheetsApi; configFile?: string; now?: () => number }): Promise<ClaudeData> {
+const sharedProbe = cachedProbe()
+
+export async function collectClaude(options: { sheets: (config: ClaudeConfig) => SheetsApi; configFile?: string; now?: () => number; probe?: Probe }): Promise<ClaudeData> {
   const now = options.now?.() ?? Date.now()
   const fetchedAt = new Date(now).toISOString()
   let config: ClaudeConfig
@@ -202,7 +203,9 @@ export async function collectClaude(options: { sheets: (config: ClaudeConfig) =>
   }
   const sheets = options.sheets(config)
   const boards = [...config.teams.flatMap((team) => team.boards), ...config.testBoards]
-  const reads = await Promise.all(boards.map(async (board) => [await readBoard(board, sheets, now), await filesHealth(config, board)] as const))
+  const probe = options.probe ?? sharedProbe
+  // Sheets reads and folder checks run side by side; both are time-limited, so this always finishes.
+  const reads = await Promise.all(boards.map((board) => Promise.all([readBoard(board, sheets, now), filesHealth(config, board, probe)])))
   const readMap = new Map(reads.map(([read]) => [read.board.id, read]))
   const views = Object.fromEntries(reads.map(([read, files]) => [read.board.id, boardView(read, files)]))
   return { availability: 'available', ownerName: config.ownerName, timezone: config.timezone, fetchedAt, teams: config.teams.map((team) => teamSummary(team, views, readMap, config, now, config.testBoards)), boards: views }

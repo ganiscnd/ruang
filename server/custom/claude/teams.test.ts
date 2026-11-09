@@ -127,7 +127,7 @@ async function collect(sheets: SheetsApi) {
   raw.teams[1].status = 'active'
   const file = path.join(await mkdtemp(path.join(tmpdir(), 'ruang-claude-')), 'teams.json')
   await writeFile(file, JSON.stringify(raw))
-  return collectClaude({ sheets: () => sheets, configFile: file, now: () => NOW })
+  return collectClaude({ sheets: () => sheets, configFile: file, now: () => NOW, probe: async () => ({ ok: false, code: 'ENOENT' }) })
 }
 
 const fakeSheets: SheetsApi = {
@@ -161,9 +161,9 @@ describe('Claude overview', () => {
 })
 
 describe('Claude routes', () => {
-  async function serve(data: ClaudeData) {
+  async function serve(data: ClaudeData | Promise<never>, timeoutMs?: number) {
     const app = express()
-    installClaude(app, { source: async () => data })
+    installClaude(app, { source: () => (data instanceof Promise ? data : Promise.resolve(data)), ...(timeoutMs ? { timeoutMs } : {}) })
     const server = app.listen(0, '127.0.0.1')
     await new Promise((resolve) => server.once('listening', resolve))
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
@@ -183,6 +183,17 @@ describe('Claude routes', () => {
       expect((await api.get('/api/custom/claude/teams/zz-9')).status).toBe(404)
       expect((await api.get('/api/custom/claude/teams/..%2Fetc')).status).toBe(400)
       expect(JSON.stringify(overview) + JSON.stringify(team)).not.toMatch(/example-sheet-id|example-icloud|example-key/)
+    } finally {
+      api.close()
+    }
+  })
+
+  it('answers 503 with the reason when the boards never load, instead of hanging', async () => {
+    const api = await serve(new Promise<never>(() => {}), 30)
+    try {
+      const response = await api.get('/api/custom/claude/teams')
+      expect(response.status).toBe(503)
+      expect(await response.json()).toEqual({ error: 'Not Available: the Claude boards did not load within 0 seconds.' })
     } finally {
       api.close()
     }

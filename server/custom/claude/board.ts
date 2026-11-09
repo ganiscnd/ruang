@@ -3,7 +3,11 @@
 // config no longer point at the right data, so the board says which column is wrong and refuses
 // every write until the config is fixed.
 import type { BoardConfig, ColumnSpec, Role } from './config.js'
+import { withTimeout } from './probe.js'
 import { a1, SheetsError, type CellValue, type SheetsApi } from './sheets.js'
+
+/** Upper bound for one board read, login included (each Google request has its own 10 s limit). */
+export const BOARD_READ_TIMEOUT_MS = 20_000
 
 /** Headers compare after trimming and collapsing spaces; case and wording must match. */
 const normalizeHeader = (value: CellValue | undefined) => String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -40,12 +44,12 @@ export interface BoardRead {
   rows: BoardRow[]
 }
 
-/** Reads every configured column of every non-empty row. Never throws: a failure is an unavailable board. */
-export async function readBoard(board: BoardConfig, sheets: SheetsApi, now = Date.now()): Promise<BoardRead> {
+/** Reads every configured column of every non-empty row. Never throws and never hangs: a failure or a slow read is an unavailable board. */
+export async function readBoard(board: BoardConfig, sheets: SheetsApi, now = Date.now(), timeoutMs = BOARD_READ_TIMEOUT_MS): Promise<BoardRead> {
   const fetchedAt = new Date(now).toISOString()
   let values: CellValue[][]
   try {
-    [values] = await sheets.batchGet(board.spreadsheetId, [boardRange(board)])
+    [values] = await withTimeout(sheets.batchGet(board.spreadsheetId, [boardRange(board)]), timeoutMs, () => new SheetsError(`Google Sheets did not answer within ${Math.round(timeoutMs / 1000)} seconds.`, 'network'))
   } catch (error) {
     return { board, fetchedAt, availability: 'unavailable', reason: error instanceof SheetsError ? error.message : 'The sheet could not be read.', rows: [] }
   }
