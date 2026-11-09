@@ -29,7 +29,7 @@ describe('Needs-you order', () => {
   const flow = computeFlow(read(SHAPE), { today: '2026-11-09', runs })
 
   it('ranks by tasks unblocked now, then everything downstream, then review > proposed > blocked, then ID', () => {
-    expect(flow.needs.map((item) => item.id)).toEqual(['T18', 'T08', 'T21', 'T22', 'T14', 'T17', 'T20'])
+    expect(flow.needs.map((item) => item.id)).toEqual(['T18', 'T08', 'T21', 'T22', 'T20', 'T14', 'T17'])
     expect(flow.needs[0]).toMatchObject({ rank: 1, unblocksNow: ['T12'], unblocksAll: ['T11', 'T12', 'T13', 'T19', 'T23'] })
     expect(flow.needs[1]).toMatchObject({ unblocksNow: [], unblocksAll: ['T19', 'T21', 'T22', 'T23'] })
   })
@@ -38,8 +38,8 @@ describe('Needs-you order', () => {
     const reason = Object.fromEntries(flow.needs.map((item) => [item.id, item.reason]))
     expect(reason.T18).toBe('Approve → T12 becomes ready; ZZ.3.B picks it at its next run (10:00 WIB). Later unlocks T11, T13, T19 and 1 more.')
     expect(reason.T08).toBe('Approve → nothing becomes ready yet: T19 also waits for T12; T21, T22 are proposed. Unlocks T19, T21, T22 and 1 more in the end.')
-    expect(reason.T21).toBe('Set ready → ZZ.3.B queue position 1 (10:00 WIB). It depends on T08 (review), not approved yet. Unlocks T23 once done.')
-    expect(reason.T20).toBe('Set ready → ZZ.3.D queue position 1 (12:00 WIB). Nothing waits for this.')
+    expect(reason.T21).toBe('Set ready → ZZ.3.B has no other work (10:00 WIB). It depends on T08 (review), not approved yet. Unlocks T23 once done.')
+    expect(reason.T20).toBe('Set ready → ZZ.3.D has no other work (12:00 WIB). Nothing waits for this.')
     expect(reason.T14).toBe('Nothing waits for this; review when you have time.')
   })
 
@@ -60,6 +60,7 @@ describe('Needs-you order', () => {
     // after the changes request and before T30 (lower ID), so position 2.
     expect(queued.needs.find((item) => item.id === 'T18')!.reason).toContain('T12 becomes ready; ZZ.3.B queue position 2 (10:00 WIB)')
     expect(queued.needs.find((item) => item.id === 'T21')!.reason).toContain('ZZ.3.B queue position 2')
+    expect(queued.needs.find((item) => item.id === 'T21')!.feedsIdleAgent).toBe(false)
     expect(queued.queues.find((queue) => queue.agent === 'ZZ.3.B')).toMatchObject({ order: ['T03', 'T30'], nextRun: { label: '10:00 WIB' } })
   })
 })
@@ -86,8 +87,24 @@ describe('task-flow details', () => {
     expect(flow.warnings).toContain('Some tasks depend on each other in a circle; check Depends on.')
   })
 
-  it('treats a blocked task like a proposed one, after reviews and proposals', () => {
-    const flow = computeFlow(read([['T01', 'ZZ.3.A', '', 'blocked'], ['T02', 'ZZ.3.A', '', 'proposed'], ['T03', 'ZZ.3.A', '', 'review']]), { today: '2026-11-09' })
+  it('among items that unlock nothing, puts first a proposed/blocked task that gives an idle agent work', () => {
+    const flow = computeFlow(read([
+      ['T01', 'ZZ.3.A', '', 'review'],
+      ['T02', 'ZZ.3.B', '', 'proposed'], ['T03', 'ZZ.3.B', '', 'ready'],
+      ['T04', 'ZZ.3.C', '', 'proposed'], ['T05', 'ZZ.3.C', '', 'in progress'],
+      ['T06', 'ZZ.3.D', '', 'blocked'],
+      ['T07', 'ZZ.3.E', '', 'proposed'], ['T08', 'ZZ.3.E', 'T07', 'waiting'],
+    ]), { today: '2026-11-09', runs })
+    // T07 unlocks T08, so it ranks by that rule first; T06 feeds idle ZZ.3.D; T02/T04 owners already have work.
+    expect(flow.needs.map((item) => [item.id, item.feedsIdleAgent])).toEqual([['T07', true], ['T06', true], ['T01', false], ['T02', false], ['T04', false]])
+    expect(flow.needs[1].reason).toBe('Unblock (set ready) → ZZ.3.D has no other work (12:00 WIB). Nothing waits for this.')
+    // T02 sorts before the already ready T03 (lower ID), so it would be picked first.
+    expect(flow.needs[3].reason).toMatch(/^Set ready → ZZ.3.B queue position 1/)
+  })
+
+  it('ranks review before proposed before blocked when nothing else differs', () => {
+    // ZZ.3.A has work in progress, so the idle-agent rule does not apply.
+    const flow = computeFlow(read([['T01', 'ZZ.3.A', '', 'blocked'], ['T02', 'ZZ.3.A', '', 'proposed'], ['T03', 'ZZ.3.A', '', 'review'], ['T04', 'ZZ.3.A', '', 'in progress', '2026-11-09']]), { today: '2026-11-09' })
     expect(flow.needs.map((item) => item.id)).toEqual(['T03', 'T02', 'T01'])
     expect(flow.needs[2].reason).toMatch(/^Unblock \(set ready\) → ZZ.3.A queue position 1\./)
   })

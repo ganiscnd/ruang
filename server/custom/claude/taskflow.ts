@@ -8,7 +8,7 @@ import type { NextRun } from './schedule.js'
 export type FlowColumn = 'needs' | 'queue' | 'working' | 'waiting' | 'done' | 'other'
 export interface Task { id: string; row: number; owner: string; status: string; deps: string[]; updated: string }
 export interface Relations { column: FlowColumn; dependsOn: string[]; unknownDeps: string[]; waitsFor: string[]; unlocks: string[]; stuck: boolean }
-export interface NeedsItem { rank: number; id: string; row: number; status: string; unblocksNow: string[]; unblocksAll: string[]; reason: string }
+export interface NeedsItem { rank: number; id: string; row: number; status: string; unblocksNow: string[]; unblocksAll: string[]; /** Setting it ready gives work to an agent that has none. */ feedsIdleAgent: boolean; reason: string }
 export interface Queue { agent: string; order: string[]; nextRun?: NextRun }
 export interface Flow { needs: NeedsItem[]; queues: Queue[]; chain: string[]; relations: Record<number, Relations>; warnings: string[] }
 
@@ -89,13 +89,19 @@ export function computeFlow(read: BoardRead, options: { today: string; runs?: Re
     const waiting = open.filter((other) => other.status === TASKFLOW.waiting).map((other) => `${other.id} also waits for ${list(missing(other).filter((dep) => dep !== task.id))}`)
     return [...waiting, ...(needsYou.length ? [`${list(needsYou.map((other) => other.id))} ${needsYou.length === 1 ? 'is' : 'are'} ${[...new Set(needsYou.map((other) => other.status))].join('/')}`] : [])]
   }
+  /** An agent with nothing queued and nothing in progress would idle through its next run. */
+  const idle = (agent: string) => Boolean(agent) && !(queues.get(agent) ?? []).some((other) => other.status === TASKFLOW.working || (TASKFLOW.queued as readonly string[]).includes(other.status))
   const order = board.needsYou?.status.map((status) => status.toLowerCase()) ?? []
   const items = [...byKey.values()].filter((task) => order.includes(task.status)).map((task) => {
     const unblocksNow = (dependents.get(task.id) ?? []).map((id) => byKey.get(id)!).filter((other) => other.status === TASKFLOW.waiting && missing(other).length === 1 && missing(other)[0] === task.id).map((other) => other.id).sort(byId)
-    return { task, unblocksNow, unblocksAll: downstream(task.id) }
-  }).sort((a, b) => b.unblocksNow.length - a.unblocksNow.length || b.unblocksAll.length - a.unblocksAll.length || order.indexOf(a.task.status) - order.indexOf(b.task.status) || byId(a.task.id, b.task.id))
+    return { task, unblocksNow, unblocksAll: downstream(task.id), feedsIdleAgent: task.status !== TASKFLOW.review && idle(task.owner) }
+  }).sort((a, b) => b.unblocksNow.length - a.unblocksNow.length || b.unblocksAll.length - a.unblocksAll.length
+    // Owner's rule (2026-11-09): among items that unlock nothing, a proposed/blocked task that gives
+    // an otherwise idle agent work comes first; that agent would idle a whole day otherwise.
+    || (!a.unblocksAll.length && !b.unblocksAll.length ? Number(b.feedsIdleAgent) - Number(a.feedsIdleAgent) : 0)
+    || order.indexOf(a.task.status) - order.indexOf(b.task.status) || byId(a.task.id, b.task.id))
 
-  const needs = items.map(({ task, unblocksNow, unblocksAll }, index): NeedsItem => {
+  const needs = items.map(({ task, unblocksNow, unblocksAll, feedsIdleAgent }, index): NeedsItem => {
     const later = unblocksAll.filter((id) => !unblocksNow.includes(id))
     const tail = later.length ? ` Later unlocks ${list(later)}.` : ''
     let reason: string
@@ -107,9 +113,10 @@ export function computeFlow(read: BoardRead, options: { today: string; runs?: Re
       const verb = task.status === 'blocked' ? 'Unblock (set ready)' : 'Set ready'
       const position = task.owner ? positionAfter(task, 'ready') : 0
       const open = missing(task).map((dep) => `${dep} (${byKey.get(dep)?.status || 'not on this board'})`)
-      reason = `${verb} → ${task.owner ? `${task.owner} queue position ${position}${runLabel(task.owner)}` : 'no owner set'}.${open.length ? ` It depends on ${open.join(', ')}, not approved yet.` : ''}${unblocksAll.length ? ` Unlocks ${list(unblocksAll)} once done.` : ' Nothing waits for this.'}`
+      const target = !task.owner ? 'no owner set' : feedsIdleAgent ? `${task.owner} has no other work${runLabel(task.owner)}` : `${task.owner} queue position ${position}${runLabel(task.owner)}`
+      reason = `${verb} → ${target}.${open.length ? ` It depends on ${open.join(', ')}, not approved yet.` : ''}${unblocksAll.length ? ` Unlocks ${list(unblocksAll)} once done.` : ' Nothing waits for this.'}`
     }
-    return { rank: index + 1, id: task.id, row: task.row, status: task.status, unblocksNow, unblocksAll, reason }
+    return { rank: index + 1, id: task.id, row: task.row, status: task.status, unblocksNow, unblocksAll, feedsIdleAgent, reason }
   })
 
   // Longest chain of open tasks (by dependency); ties go to the chain that starts with the

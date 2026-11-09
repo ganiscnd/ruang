@@ -40,7 +40,7 @@ export interface ClaudeTeamData { team: TeamSummary; boards: BoardView[]; ownerN
 
 export type FlowColumn = 'needs' | 'queue' | 'working' | 'waiting' | 'done' | 'other'
 export interface Relations { column: FlowColumn; dependsOn: string[]; unknownDeps: string[]; waitsFor: string[]; unlocks: string[]; stuck: boolean }
-export interface NeedsItem { rank: number; id: string; row: number; status: string; unblocksNow: string[]; unblocksAll: string[]; reason: string }
+export interface NeedsItem { rank: number; id: string; row: number; status: string; unblocksNow: string[]; unblocksAll: string[]; feedsIdleAgent: boolean; reason: string }
 export interface Queue { agent: string; order: string[]; nextRun?: NextRun }
 export interface Flow { needs: NeedsItem[]; queues: Queue[]; chain: string[]; warnings: string[] }
 

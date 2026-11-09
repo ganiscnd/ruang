@@ -20,8 +20,8 @@ const board: BoardView = {
   ],
   flow: {
     needs: [
-      { rank: 1, id: 'T02', row: 3, status: 'review', unblocksNow: ['T03'], unblocksAll: ['T03'], reason: 'Approve → T03 becomes ready; ZZ.3.B picks it at its next run (10:00 WIB).' },
-      { rank: 2, id: 'T01', row: 2, status: 'review', unblocksNow: [], unblocksAll: [], reason: 'Nothing waits for this; review when you have time.' },
+      { rank: 1, id: 'T02', row: 3, status: 'review', unblocksNow: ['T03'], unblocksAll: ['T03'], feedsIdleAgent: false, reason: 'Approve → T03 becomes ready; ZZ.3.B picks it at its next run (10:00 WIB).' },
+      { rank: 2, id: 'T01', row: 2, status: 'review', unblocksNow: [], unblocksAll: [], feedsIdleAgent: false, reason: 'Nothing waits for this; review when you have time.' },
     ],
     queues: [{ agent: 'ZZ.3.B', order: [], nextRun: { label: '10:00 WIB' } }],
     chain: ['T02', 'T03'],
