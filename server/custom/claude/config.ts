@@ -36,7 +36,7 @@ export interface BoardConfig {
 }
 export interface AgentConfig { code: string; name: string; schedule: string; runsOnMac: boolean; notifierOnly: boolean; boards: string[] }
 export interface TeamConfig { code: string; slug: string; name: string; status: 'active' | 'paused'; agents: AgentConfig[]; boards: BoardConfig[] }
-export interface ClaudeConfig { timezone: string; ownerName: string; keyFile: string; icloudRoot?: string; teams: TeamConfig[]; testBoards: BoardConfig[] }
+export interface ClaudeConfig { timezone: string; ownerName: string; /** Writes to live boards; off until the owner turns it on (test copies are always writable). */ liveWrites: boolean; keyFile: string; icloudRoot?: string; teams: TeamConfig[]; testBoards: BoardConfig[] }
 
 export class ClaudeConfigError extends Error {}
 
@@ -221,7 +221,8 @@ export function parseClaudeConfig(value: unknown): ClaudeConfig {
       testCopyOf: of,
     })
   })
-  return { timezone, ownerName, keyFile, ...(icloudRoot ? { icloudRoot } : {}), teams, testBoards }
+  if (raw.liveWrites !== undefined && typeof raw.liveWrites !== 'boolean') throw new ClaudeConfigError('liveWrites must be true or false.')
+  return { timezone, ownerName, liveWrites: raw.liveWrites === true, keyFile, ...(icloudRoot ? { icloudRoot } : {}), teams, testBoards }
 }
 
 export async function loadClaudeConfig(file = claudeConfigPath()): Promise<ClaudeConfig> {

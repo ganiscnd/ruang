@@ -16,6 +16,14 @@ The owner reads Python but not JavaScript/TypeScript: explain decisions in plain
 - Write actions are allowed ONLY through a small, explicit allowlist of Hermes commands, each with a
   confirmation step in the UI and an entry in the existing command audit log. Never edit Hermes
   files directly.
+- The one other write path (approved 2026-11-09): Google Sheets writes of the Claude section,
+  only in `server/custom/claude/actions.ts` (`claude.note`, `claude.status`), under the same
+  safeguards (access code on and unlocked, preview → single-use token → execute, rate limits,
+  `write-audit.jsonl` without comment text, command log with WRITE). Only single cells in
+  `writableColumns`, RAW input, owner notes appended never overwritten, status only from
+  `ganiCanSetStatus`, refused when the row changed since it was opened or a header does not match.
+  Never insert, delete, sort or move rows. Live boards stay refused until the owner sets
+  `"liveWrites": true` in the private config; test writes go to test copies (`testBoards`) only.
 - Keep custom code separated from upstream code where practical (dedicated folders/modules for the
   custom features, e.g. `server/custom/`, `src/custom/`) so future upstream updates still merge.
   When an upstream file must change, keep the hook small and mark it with a `// custom:` comment.

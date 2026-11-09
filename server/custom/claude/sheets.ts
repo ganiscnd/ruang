@@ -86,8 +86,12 @@ export type CellValue = string | number | boolean
 export type Rows = CellValue[][]
 export type Render = 'FORMATTED_VALUE' | 'UNFORMATTED_VALUE'
 
+export interface CellWrite { range: string; value: string }
+
 export interface SheetsApi {
   batchGet(spreadsheetId: string, ranges: string[], render?: Render): Promise<Rows[]>
+  /** Writes single cells only. RAW: text is stored as typed, so "=…" never becomes a formula. */
+  batchUpdate?(spreadsheetId: string, cells: CellWrite[]): Promise<void>
 }
 
 export class SheetsClient implements SheetsApi {
@@ -139,5 +143,12 @@ export class SheetsClient implements SheetsApi {
     const ranged = body?.valueRanges
     if (!Array.isArray(ranged) || ranged.length !== ranges.length) throw new SheetsError('Google returned an unexpected answer.', 'google')
     return ranged.map((item) => (Array.isArray(item.values) ? item.values : []))
+  }
+
+  async batchUpdate(spreadsheetId: string, cells: CellWrite[]): Promise<void> {
+    if (!cells.length) return
+    const body = { valueInputOption: 'RAW', data: cells.map((cell) => ({ range: cell.range, majorDimension: 'ROWS', values: [[cell.value]] })) }
+    const answer = await this.call(`${SHEETS_API}/${encodeURIComponent(spreadsheetId)}/values:batchUpdate`, { method: 'POST', headers: { authorization: `Bearer ${await this.accessToken()}`, 'content-type': 'application/json' }, body: JSON.stringify(body) }) as { totalUpdatedCells?: unknown } | undefined
+    if (answer?.totalUpdatedCells !== cells.length) throw new SheetsError(`Google reported ${String(answer?.totalUpdatedCells ?? 'no')} updated cells instead of ${cells.length}.`, 'google')
   }
 }

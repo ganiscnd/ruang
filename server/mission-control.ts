@@ -440,7 +440,8 @@ export function parseLogLines(output: string): LogLine[] {
 
 const commandLog: CommandLogEntry[] = []
 
-function recordCommand(entry: CommandLogEntry): void {
+// custom: exported so the Claude section's Sheets writes show in the command log (server/custom/claude/actions.ts).
+export function recordCommand(entry: CommandLogEntry): void {
   commandLog.unshift(entry)
   if (commandLog.length > COMMAND_LOG_LIMIT) commandLog.length = COMMAND_LOG_LIMIT
 }

@@ -86,3 +86,11 @@
 .mini-markdown h3, .mini-markdown h4, .mini-markdown h5 { margin: 14px 0 6px; }
 .mini-markdown pre { overflow: auto; }
 .mini-markdown li.nested { margin-left: 18px; }
+.claude-form { display: grid; gap: 8px; }
+.claude-form textarea, .claude-form select { background: var(--c-101311); border: 1px solid var(--c-313831); color: inherit; font: inherit; padding: 8px; resize: vertical; width: 100%; }
+.claude-form select { display: block; margin-top: 4px; max-width: 320px; }
+.claude-answer { display: grid; gap: 4px; }
+.claude-quick { display: flex; gap: 6px; }
+.claude-cells { display: grid; gap: 10px; }
+.claude-cells p { margin: 0; }
+.claude-cell-change span { color: var(--c-9ea79e); text-decoration: line-through; }

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Dialog } from '../../ui.tsx'
 import { FileViewer } from './FileViewer.tsx'
+import { NoteForm } from './NoteForm.tsx'
 import type { AgentNotes, PathStateName, RowDetail } from './types.ts'
 
 const STATE_LABEL: Partial<Record<PathStateName, string>> = { missing: 'Not found', 'not-downloaded': 'Not downloaded on the Mac yet', refused: 'Outside the output folder', error: 'Not Available' }
@@ -21,19 +22,22 @@ export function AgentNotesView({ notes }: { notes: AgentNotes }) {
   </div>
 }
 
-export function CardDetail({ board, row, onClose, onOpenTask }: { board: string; row: number; onClose: () => void; onOpenTask?: (id: string) => void }) {
+export function CardDetail({ board, row, onClose, onOpenTask, onChanged, notice }: { board: string; row: number; onClose: () => void; onOpenTask?: (id: string) => void; onChanged?: () => void; notice?: string }) {
   const [state, setState] = useState<{ status: 'pending' } | { status: 'ready'; detail: RowDetail } | { status: 'failed'; message: string }>({ status: 'pending' })
   const [file, setFile] = useState<string | undefined>()
+  const [reload, setReload] = useState(0)
+  const [saved, setSaved] = useState<string | undefined>()
   useEffect(() => {
     let active = true
-    setState({ status: 'pending' })
+    if (!reload) setState({ status: 'pending' })
     setFile(undefined)
-    fetch(`/api/custom/claude/boards/${encodeURIComponent(board)}/rows/${row}`).then(async (response) => {
+    // After a write, read the row fresh so the panel shows what the sheet holds now.
+    fetch(`/api/custom/claude/boards/${encodeURIComponent(board)}/rows/${row}${reload ? '?fresh=1' : ''}`).then(async (response) => {
       const body = await response.json().catch(() => undefined) as RowDetail & { error?: string } | undefined
       if (active) setState(response.ok && body ? { status: 'ready', detail: body } : { status: 'failed', message: body?.error ?? `The row could not be loaded (HTTP ${response.status}).` })
     }, () => { if (active) setState({ status: 'failed', message: 'The Ruang API could not be reached.' }) })
     return () => { active = false }
-  }, [board, row])
+  }, [board, row, reload])
   const detail = state.status === 'ready' ? state.detail : undefined
   const card = detail?.card
   const relations = card?.relations
@@ -45,6 +49,7 @@ export function CardDetail({ board, row, onClose, onOpenTask }: { board: string;
       <p className="eyebrow">{detail.board.title}{detail.board.testCopy ? ' · TEST COPY' : ''} · ROW {card.row}</p>
       <h2 id="claude-detail-title">{card.id && <span className="claude-code">{card.id} </span>}{card.title}</h2>
       {detail.board.readOnly && <p className="form-error">{detail.board.readOnly}</p>}
+      {saved && <p className="form-success" role="status">{saved}</p>}
       <dl className="claude-detail-grid">
         <div><dt>Status</dt><dd>{card.status || '(no status)'}{relations?.stuck ? ' · stuck (not updated today)' : ''}</dd></div>
         {card.owner !== undefined && <div><dt>Owner</dt><dd>{card.owner}</dd></div>}
@@ -68,8 +73,10 @@ export function CardDetail({ board, row, onClose, onOpenTask }: { board: string;
         {file !== undefined && <FileViewer board={detail.board.id} path={file} onOpen={setFile} onClose={() => setFile(undefined)}/>}
       </section>}
       <section className="claude-section"><h3>{detail.ownerName} notes</h3>
+        {detail.notesLength > 40_000 && <p className="notice">This cell holds {detail.notesLength.toLocaleString('en-US')} characters; a Google Sheets cell holds at most 50,000.</p>}
         {detail.ownerNotes.length ? detail.ownerNotes.map((block, index) => <article key={index} className="claude-note-block">{block.heading ? <h4>{block.heading}</h4> : detail.ownerNotes.length > 1 ? <h4 className="muted">Earlier notes (no date)</h4> : null}<p className="claude-pre">{block.lines.join('\n')}</p></article>) : <p className="muted">No notes yet.</p>}
       </section>
+      <NoteForm key={`${detail.seen.status}-${detail.seen.notes}`} detail={detail} notice={notice} onSaved={(message) => { setSaved(message); setReload((value) => value + 1); onChanged?.() }}/>
     </>}
   </Dialog>
 }

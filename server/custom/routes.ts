@@ -8,21 +8,16 @@ import { ActionError, WriteActions, type ActionContext } from './actions.js'
 import { installClaude } from './claude/routes.js'
 import type { ClaudeData } from './claude/teams.js'
 import { collectPipeline, type LeadDetail, type PipelineData } from './pipeline.js'
+import { sameOrigin, writeStatus } from './guard.js'
 import { ValidationError } from './validate.js'
+
+export { sameOrigin, writeStatus, type WriteStatus } from './guard.js'
 
 const PIPELINE_CACHE_MS = 30_000
 const FRESH_WINDOW_MS = 25_000
 const PRIVATE_COMMENT = '🔒 Private comment'
 
 export const pipelineSource = cachedSource(() => collectPipeline(), PIPELINE_CACHE_MS)
-
-export interface WriteStatus { enabled: boolean; reason?: string }
-
-export function writeStatus(access: AccessOfRequest): WriteStatus {
-  if (!access.enabled) return { enabled: false, reason: 'Write actions need the access code. Turn it on in Settings.' }
-  if (!access.unlocked || !access.session) return { enabled: false, reason: 'Ruang is locked. Enter the access code to use write actions.' }
-  return { enabled: true }
-}
 
 /** Withholds what locked agents wrote or work on: work card titles, their comments and stage reasons. */
 export function redactLead(lead: LeadDetail, privacy: Privacy): LeadDetail {
@@ -37,24 +32,6 @@ export function redactLead(lead: LeadDetail, privacy: Privacy): LeadDetail {
 
 function listView(data: PipelineData, privacy: Privacy) {
   return { ...data, leads: data.leads.map((lead) => { const { comments: _comments, stageHistory: _history, ...summary } = redactLead(lead, privacy); void _comments; void _history; return summary }) }
-}
-
-/**
- * Write requests must come from Ruang's own page: the custom header needs a CORS preflight that
- * Ruang never answers, and the browser's own same-origin signals must agree when it sends them.
- */
-export function sameOrigin(request: Request): string | undefined {
-  if (request.get('x-ruang-request') !== '1') return 'Missing request header.'
-  const site = request.get('sec-fetch-site')
-  if (site && site !== 'same-origin') return 'Cross-site request.'
-  const origin = request.get('origin')
-  if (origin) {
-    let host: string
-    try { host = new URL(origin).host } catch { return 'Bad origin.' }
-    const allowed = [request.get('host'), request.get('x-forwarded-host')].filter(Boolean)
-    if (!allowed.includes(host)) return 'Cross-origin request.'
-  }
-  return undefined
 }
 
 export interface CustomOptions {
@@ -77,7 +54,7 @@ export function installCustom(app: Express, options: CustomOptions): void {
   const profiles = options.profiles ?? (async () => { const runtime = await getSnapshot(); return runtime.profiles.availability === 'available' ? runtime.profiles.data.map((profile) => profile.name) : [] })
   const afterWrite = options.afterWrite ?? (() => { pipelineSource.clear(); clearTaskBoardCache() })
   const now = (request: Request) => Date.now() + (request.query.fresh === '1' ? FRESH_WINDOW_MS : 0)
-  installClaude(app, { ...(options.claudeSource ? { source: options.claudeSource } : {}) })
+  installClaude(app, { accessOf: options.accessOf, ...(options.claudeSource ? { source: options.claudeSource } : {}) })
 
   app.get('/api/custom/pipeline', async (request, response) => {
     const [data, privacy, access] = await Promise.all([source(now(request)), options.privacyOf(request), options.accessOf(request)])

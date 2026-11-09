@@ -36,7 +36,7 @@ export interface TeamSummary {
   agents: AgentLine[]
 }
 export interface ClaudeOverview { availability: 'available' | 'unavailable'; reason?: string; ownerName: string; timezone: string; fetchedAt: string; teams: TeamSummary[] }
-export interface ClaudeTeamData { team: TeamSummary; boards: BoardView[]; ownerName: string; timezone: string; fetchedAt: string }
+export interface ClaudeTeamData { team: TeamSummary; boards: BoardView[]; ownerName: string; timezone: string; fetchedAt: string; writes?: { enabled: boolean; reason?: string } }
 
 export type FlowColumn = 'needs' | 'queue' | 'working' | 'waiting' | 'done' | 'other'
 export interface Relations { column: FlowColumn; dependsOn: string[]; unknownDeps: string[]; waitsFor: string[]; unlocks: string[]; stuck: boolean }
@@ -48,7 +48,12 @@ export interface Question { n: number; text: string; recommend?: string }
 export interface AgentNotes { format: 'sections' | 'paragraphs' | 'empty'; done: string[]; check: string[]; questions: Question[]; other: string[] }
 export interface NoteBlock { date?: string; heading?: string; lines: string[] }
 export type PathStateName = 'file' | 'dir' | 'missing' | 'not-downloaded' | 'refused' | 'error' | 'unknown'
+export interface RowWrite { allowed: boolean; reason?: string; statuses: string[]; comments: boolean }
 export interface RowDetail {
+  key: string
+  seen: { status: string; notes: string }
+  write: RowWrite
+  notesLength: number
   board: { id: string; title: string; kind: 'taskflow' | 'table'; testCopy: boolean; fetchedAt: string; readOnly?: string; hasFiles: boolean }
   card: CardSummary
   fields: { key: string; header: string; value: string }[]

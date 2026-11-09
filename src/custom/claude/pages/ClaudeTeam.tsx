@@ -85,7 +85,7 @@ export function ClaudeTeamView({ team }: { team: Polled<ClaudeTeamData> }) {
       <Agents agents={data.team.agents}/>
       <div className="room-tabs" role="tablist" aria-label="Boards">{data.boards.map((item) => <button type="button" role="tab" key={item.id} aria-selected={board?.id === item.id} className={board?.id === item.id ? 'active' : ''} onClick={() => setTab(item.id)}>{item.title} <span className="room-count">{item.availability === 'available' ? item.needsYou.length : '?'}</span></button>)}</div>
       {board && <Board board={board} paused={data.team.status === 'paused'} onOpen={(card) => setOpen({ board: board.id, row: card.row })} agent={agent} onAgent={setAgent}/>}
-      {open && <CardDetail key={`${open.board}-${open.row}`} board={open.board} row={open.row} onClose={() => setOpen(undefined)} onOpenTask={openTask}/>}
+      {open && <CardDetail key={`${open.board}-${open.row}`} board={open.board} row={open.row} onClose={() => setOpen(undefined)} onOpenTask={openTask} onChanged={team.refresh}/>}
     </>}
   </>
 }

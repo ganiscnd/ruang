@@ -62,6 +62,7 @@ export interface ClaudeData {
   /** Server only (never sent): the rows behind each board and its output folder's absolute path. */
   reads: Record<string, BoardRead>
   fileRoots: Record<string, string>
+  liveWrites: boolean
 }
 
 const readTime = (iso: string, timeZone: string) => new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' }).format(Date.parse(iso))
@@ -215,7 +216,7 @@ export async function collectClaude(options: { sheets: (config: ClaudeConfig) =>
   try {
     config = await loadClaudeConfig(options.configFile)
   } catch (error) {
-    return { availability: 'unavailable', reason: error instanceof Error ? error.message : 'The Claude teams config cannot be read.', ownerName: 'Owner', timezone: 'Asia/Jakarta', fetchedAt, teams: [], boards: {}, reads: {}, fileRoots: {} }
+    return { availability: 'unavailable', reason: error instanceof Error ? error.message : 'The Claude teams config cannot be read.', ownerName: 'Owner', timezone: 'Asia/Jakarta', fetchedAt, teams: [], boards: {}, reads: {}, fileRoots: {}, liveWrites: false }
   }
   const sheets = options.sheets(config)
   const boards = [...config.teams.flatMap((team) => team.boards), ...config.testBoards]
@@ -227,5 +228,5 @@ export async function collectClaude(options: { sheets: (config: ClaudeConfig) =>
   const runs = new Map(config.teams.map((team) => [team.code, new Map(team.agents.map((agent) => [agent.code, nextRun(agent, team.status === 'paused', now, config.timezone)]))]))
   const views = Object.fromEntries(reads.map(([read, files]) => [read.board.id, boardView(read, files, { today, ...(runs.get(read.board.team) ? { runs: runs.get(read.board.team)! } : {}) })]))
   const fileRoots = Object.fromEntries(boards.flatMap((board) => (board.files && config.icloudRoot ? [[board.id, path.join(config.icloudRoot, board.files.root)]] : [])))
-  return { availability: 'available', ownerName: config.ownerName, timezone: config.timezone, fetchedAt, teams: config.teams.map((team) => teamSummary(team, views, readMap, config, now, config.testBoards)), boards: views, reads: Object.fromEntries(readMap), fileRoots }
+  return { availability: 'available', ownerName: config.ownerName, timezone: config.timezone, fetchedAt, teams: config.teams.map((team) => teamSummary(team, views, readMap, config, now, config.testBoards)), boards: views, reads: Object.fromEntries(readMap), fileRoots, liveWrites: config.liveWrites }
 }
