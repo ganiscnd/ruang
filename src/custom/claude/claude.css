@@ -96,3 +96,15 @@
 .claude-cell-change span { color: var(--c-9ea79e); text-decoration: line-through; }
 .claude-sort { background: none; border: 0; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; padding: 0; text-transform: inherit; }
 .claude-sort:hover { color: var(--claude-accent); }
+.claude-team-tag-3d { background: rgba(43, 29, 23, 0.85); border: 1px solid var(--claude-accent); border-radius: 4px; color: #f8e9df; cursor: pointer; font: 11px ui-monospace, monospace; padding: 3px 8px; pointer-events: auto; white-space: nowrap; }
+.claude-agent-tag .badge.good { background: #3a2016; color: #ffc9b3; }
+.claude-wing-2d { display: grid; gap: 12px; }
+.claude-wing-teams { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.claude-wing-team { border: 1px solid var(--c-313831); border-top: 3px solid var(--claude-accent); display: grid; gap: 8px; padding: 10px; }
+.claude-wing-team.paused { border-top-color: var(--c-778078); opacity: .8; }
+.claude-wing-team header { align-items: center; border: 0; display: flex; gap: 8px; justify-content: space-between; padding: 0; }
+.claude-wing-team header a { color: inherit; text-decoration: none; }
+.claude-wing-agents { display: grid; gap: 6px; }
+.claude-wing-agent { align-items: center; background: transparent; border: 1px solid var(--c-313831); border-radius: 4px; color: inherit; cursor: pointer; display: grid; font: inherit; gap: 2px 8px; grid-template-columns: auto 1fr; padding: 6px 8px; text-align: left; }
+.claude-wing-agent small { grid-column: 1 / -1; }
+.claude-wing-agent:hover, .claude-wing-agent:focus-visible { border-color: var(--claude-accent); }

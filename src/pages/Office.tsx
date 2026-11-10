@@ -14,6 +14,9 @@ import { TaskBoard } from './TaskBoard.tsx'
 import { formatCost } from '../usage.ts'
 import { RelockBar } from '../ProfileLock.tsx'
 import { TokenUsage } from './TokenUsage.tsx'
+// custom: the Claude teams' wing (src/custom/claude).
+import { ClaudeWing2D } from '../custom/claude/ClaudeWing2D.tsx'
+import { useClaudeOverview } from '../custom/claude/use-claude-overview.ts'
 
 // The 3D view (three.js) is only downloaded when someone switches to it.
 const Office3D = lazy(() => import('./Office3D.tsx'))
@@ -161,6 +164,9 @@ export function Office({ dashboard, dashboardPending = false, onNavigate }: { da
   const [selectedName, setSelectedName] = useState<OfficeStation['name'] | undefined>()
   const selectedTrigger = useRef<HTMLElement | null>(null)
   const [chosenRoom, setChosenRoom] = useState<OfficeRoom | undefined>()
+  // custom: the Claude wing, in 3D east of the office and in 2D as its own tab.
+  const claude = useClaudeOverview()
+  const [claudeTab, setClaudeTab] = useState(false)
   const [view, setView] = useState<OfficeView>(() => typeof window === 'undefined' ? '2d' : storedView())
   const [webgl] = useState(() => typeof document === 'undefined' || webglAvailable())
   const [panel, setPanel] = useState<PanelTab | undefined>(() => typeof window === 'undefined' ? undefined : storedPanel())
@@ -200,7 +206,8 @@ export function Office({ dashboard, dashboardPending = false, onNavigate }: { da
       <button type="button" className={`panel-toggle${panel ? ' active' : ''}`} aria-expanded={Boolean(panel)} aria-controls="office-panel" onClick={() => choosePanel(panel ? undefined : 'Crew')}>◧ Panel</button>
     </div>
     <div className="office-canvas">
-      {show3d ? <SceneBoundary fallback={<section className="empty-state"><h2>3D view unavailable</h2><p>The 3D office could not start on this device. Switch back to 2D.</p></section>}><Suspense fallback={<LoadingState message="Loading the 3D office..."/>}><Office3D stations={office?.stations ?? []} onSelect={select3d}/></Suspense></SceneBoundary> : <>{view === '3d' && !webgl && <p className="muted office-note">3D needs WebGL, which this browser does not provide. Showing 2D.</p>}<div className="room-tabs" role="tablist" aria-label="Office rooms">{ROOMS.map((item) => <button role="tab" aria-selected={room === item} className={room === item ? 'active' : ''} onClick={() => setChosenRoom(item)} key={item}>{item} <span className="room-count">{counts[item]}</span></button>)}</div>
+      {show3d ? <SceneBoundary fallback={<section className="empty-state"><h2>3D view unavailable</h2><p>The 3D office could not start on this device. Switch back to 2D.</p></section>}><Suspense fallback={<LoadingState message="Loading the 3D office..."/>}><Office3D stations={office?.stations ?? []} onSelect={select3d} claude={claude}/></Suspense></SceneBoundary> : <>{view === '3d' && !webgl && <p className="muted office-note">3D needs WebGL, which this browser does not provide. Showing 2D.</p>}<div className="room-tabs" role="tablist" aria-label="Office rooms">{ROOMS.map((item) => <button role="tab" aria-selected={room === item && !claudeTab} className={room === item && !claudeTab ? 'active' : ''} onClick={() => { setChosenRoom(item); setClaudeTab(false) }} key={item}>{item} <span className="room-count">{counts[item]}</span></button>)}{claude?.availability === 'available' && <button role="tab" aria-selected={claudeTab} className={claudeTab ? 'active' : ''} onClick={() => setClaudeTab(true)}>Claude wing <span className="room-count">{claude.teams.reduce((sum, team) => sum + team.agents.length, 0)}</span></button>}</div>
+        {claudeTab ? <div className="room-scroll"><ClaudeWing2D data={claude}/></div> : <>
         <div className="room-scroll"><section className={`pixel-room flow ${room.toLowerCase()}`} aria-label={`${room} room`}><div className="room-label"><span>{room}</span><small>{room === 'Workspace' ? `${deskCount} HOT DESK${deskCount === 1 ? '' : 'S'} + MEETING ROOM` : 'QUIET BREAK AREA'}</small></div>
           {room === 'Workspace' ? <>
             <div className="flow-desks">{Array.from({ length: deskCount }, (_, index) => {
@@ -214,7 +221,7 @@ export function Office({ dashboard, dashboardPending = false, onNavigate }: { da
           </>}
           {room === 'Lounge' && stations.length === 0 && <p className="room-empty">No declared idle presence</p>}
           {room === 'Workspace' && stations.length === 0 && office && <p className="room-empty">Desks are empty · crew is in the Lounge</p>}
-        </section></div></>}
+        </section></div></>}</>}
       {snapshot.status === 'failed' && <section className="empty-state office-failed"><h2>Not Available</h2><p>The office source could not be reached.</p></section>}
     </div>
     {show3d && <small className="office-3d-hint">Drag to rotate · right-drag, two fingers or Geser to pan · scroll to zoom · click an agent for details</small>}

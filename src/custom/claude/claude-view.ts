@@ -71,3 +71,7 @@ export function sortCards(cards: readonly CardSummary[], sort: SortState): CardS
     return (sort.direction === 'asc' ? order : -order) || a.row - b.row
   })
 }
+
+/** Opens a team page from the office (3D wing or 2D section); with an agent, filtered to its cards. */
+export const openClaudeAgent = (team: string, agent: string) => { window.location.hash = `/claude/${team}?agent=${encodeURIComponent(agent)}` }
+export const openClaudeTeam = (team: string) => { window.location.hash = teamHash(team).slice(1) }

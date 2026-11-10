@@ -8,6 +8,13 @@ import { clampTarget, createLayout, FLOOR_HEIGHT, floorOf, GAME_ROOM, idlePlan, 
 import { Environment } from '../scene3d/environment.tsx'
 import { RBox, WorkDesk } from '../scene3d/props.tsx'
 import type { OfficeStation } from '../types.ts'
+// custom: the Claude wing (src/custom/claude), a separate building east of the office.
+import { ClaudeWing3D } from '../custom/claude/scene3d/ClaudeWing3D.tsx'
+import { openClaudeAgent, openClaudeTeam } from '../custom/claude/claude-view.ts'
+import { ClaudeWingLabels } from '../custom/claude/scene3d/ClaudeWingLabels.tsx'
+import type { ClaudeOverview } from '../custom/claude/types.ts'
+import { wingShape } from '../custom/claude/use-claude-overview.ts'
+import { wingLayout, withWing } from '../custom/claude/wing-layout.ts'
 
 // 3D view of the same Office snapshot the 2D view renders. Positions come from each station's
 // room, roomPosition and seat, so the 3D office shows exactly the states the server derived.
@@ -294,7 +301,7 @@ function useFloor(): [Floor, (floor: Floor) => void] {
   }]
 }
 
-export default function Office3D({ stations, onSelect }: { stations: OfficeStation[]; onSelect: (station: OfficeStation, trigger: HTMLElement | null) => void }) {
+export default function Office3D({ stations, onSelect, claude }: { stations: OfficeStation[]; onSelect: (station: OfficeStation, trigger: HTMLElement | null) => void; claude?: ClaudeOverview }) {
   const anchors = useRef(new Map<string, THREE.Object3D>())
   const labels = useRef(new Map<string, HTMLElement>())
   const view = useRef<ViewHandle>(null)
@@ -305,7 +312,11 @@ export default function Office3D({ stations, onSelect }: { stations: OfficeStati
   const [sleepMode, setSleepMode] = useStoredFlag(SLEEP_KEY)
   const now = useClock(2000)
   // One unlabeled desk per agent (hot desking); the building is sized for the crew.
-  const layout = useMemo(() => createLayout(stations.length), [stations.length])
+  // custom: the Claude wing widens the pan area; "Claude wing" moves the camera there.
+  const shape = wingShape(claude)
+  const wing = useMemo(() => (shape ? wingLayout(JSON.parse(shape)) : undefined), [shape])
+  const [focus, setFocus] = useState<'office' | 'claude'>('office')
+  const layout = useMemo(() => withWing(createLayout(stations.length), wing, focus), [stations.length, wing, focus])
   // Idle agents wander between the lounge, the game room, the pantry, the street food and
   // lantai 2 (decorative only), spread so no two share a spot. With sleep mode on, every idle
   // agent goes to bed upstairs instead.
@@ -325,10 +336,12 @@ export default function Office3D({ stations, onSelect }: { stations: OfficeStati
       <Environment night={theme === 'dark'} layout={layout} floor={floor}/>
       {floor === 1 && layout.desks.map((position, index) => <WorkDesk key={index} position={position} active={occupiedSeats.has(index + 1)} withChair/>)}
       {stations.map((station) => <Character key={station.id} station={station} placement={placement(station)} layout={layout} floor={floor} onSelect={onSelect} anchor={register(anchors, `agent-${station.id}`)}/>)}
+      {/* custom: Claude wing */}{wing && claude && <ClaudeWing3D data={claude} layout={wing} handlers={{ anchor: (key) => register(anchors, key), onAgent: openClaudeAgent, onTeam: openClaudeTeam }}/>}
       <LabelProjector anchors={anchors} labels={labels}/>
       <Controls key={layout.deskCount} ref={view} panMode={panMode} keyTarget={keyTarget} layout={layout} elevation={floor === 2 ? FLOOR_HEIGHT : 0}/>
     </Canvas>
     <div className="office-3d-labels">
+      {/* custom: Claude wing labels */}{wing && claude && <ClaudeWingLabels data={claude} label={(key) => register(labels, key)}/>}
       {stations.map((station) => {
         const badge = officeStateBadge(station.state)
         const busy = ['Working', 'Reviewing', 'Collaborating'].includes(station.state)
@@ -348,6 +361,7 @@ export default function Office3D({ stations, onSelect }: { stations: OfficeStati
     <div className="office-3d-tools">
       <button type="button" className={sleepMode ? 'active sleep' : ''} aria-pressed={sleepMode} onClick={() => { setSleepMode(!sleepMode); if (!sleepMode && idleSeats.length > 0) setFloor(2) }} title="Send every idle agent to bed on lantai 2">💤 Tidur</button>
       <button type="button" className={panMode ? 'active' : ''} aria-pressed={panMode} onClick={() => setPanMode((value) => !value)} title="Drag moves the view instead of rotating it">✥ Geser</button>
+      {/* custom: camera preset for the Claude wing */}{wing && <button type="button" className={focus === 'claude' ? 'active' : ''} aria-pressed={focus === 'claude'} onClick={() => setFocus(focus === 'claude' ? 'office' : 'claude')} title="Look at the Claude teams' building (east of the office)">◈ Claude wing</button>}
       <button type="button" onClick={() => view.current?.reset()} title="Back to the starting view">↺ Reset view</button>
     </div>
   </div>
