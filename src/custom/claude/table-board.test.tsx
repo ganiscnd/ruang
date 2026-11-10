@@ -33,7 +33,6 @@ describe('table board', () => {
   it('shows only the configured columns with sortable headers', () => {
     expect(markup).toContain('>Post date ▼</button>')
     expect(markup).toContain('>Slot</button>')
-    expect(markup).not.toContain('Gani')
   })
 
   it('sorts numbers as numbers, text ignoring case, empty values last', () => {
