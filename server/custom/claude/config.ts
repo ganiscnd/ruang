@@ -31,6 +31,8 @@ export interface BoardConfig {
   files?: { root: string; pattern?: string }
   /** The column that dates a row (Found / Post date / Date Found), for "ran today". */
   dateColumn?: string
+  /** Columns of the table view (table boards); default: date, title, status, score and one short field. */
+  tableColumns?: string[]
   /** Set on a test copy: the live board whose settings it shares. Writes are tested only here. */
   testCopyOf?: string
 }
@@ -157,6 +159,7 @@ function parseBoard(raw: Raw, where: string, team: string): BoardConfig {
     writableColumns,
     ...(files ? { files: { root: relativeRoot(files.root, `${where}.files.root`), ...(files.pattern !== undefined ? { pattern: text(files.pattern, `${where}.files.pattern`) } : {}) } } : {}),
     ...(dateColumn ? { dateColumn } : {}),
+    ...(raw.tableColumns !== undefined ? { tableColumns: texts(raw.tableColumns, `${where}.tableColumns`).map((key) => known(key, 'tableColumns')) } : {}),
   }
 }
 

@@ -9,7 +9,7 @@ const detail = (write: RowDetail['write']): RowDetail => ({
   key: 'T04', seen: { status: 'review', notes: '0'.repeat(64) }, write, notesLength: 10,
   board: { id: 'example-lab-copy', title: 'Lab board (test copy)', kind: 'taskflow', testCopy: true, fetchedAt: '2026-11-09T02:00:00.000Z', hasFiles: false },
   card: { row: 5, key: 'T04', id: 'T04', title: 'Example task', status: 'review', statusKey: 'review' },
-  fields: [], task: '', ownerNotes: [], outputs: [], ownerName: 'Owner',
+  fields: [], agentNotesHeader: 'Agent notes', task: '', ownerNotes: [], outputs: [], ownerName: 'Owner',
   agentNotes: { format: 'sections', done: [], check: [], questions: [{ n: 1, text: 'One sheet?', recommend: 'one sheet' }, { n: 2, text: 'Ship today?' }], other: [] },
 })
 

@@ -10,7 +10,7 @@ import { exampleConfig } from './example.fixture.js'
 import { installClaude } from './routes.js'
 import { localDate, nextRun, runTimes } from './schedule.js'
 import { SheetsError, type SheetsApi } from './sheets.js'
-import { agentLine, collectClaude, type ClaudeData } from './teams.js'
+import { agentLine, collectClaude, tableColumns, type ClaudeData } from './teams.js'
 
 // 2026-11-09 09:30 in Jakarta (UTC+7).
 const NOW = Date.parse('2026-11-09T02:30:00Z')
@@ -143,7 +143,8 @@ describe('Claude overview', () => {
     const data = await collect(fakeSheets)
     expect(data).toMatchObject({ availability: 'available', ownerName: 'Owner', timezone: TZ })
     const [content, lab] = data.teams
-    expect(content).toMatchObject({ slug: 'zz-1', needsYou: 2, incomplete: false, working: null, waiting: null, nextRun: { agent: 'ZZ.1.A', run: { label: 'Tomorrow 06:00 WIB' } } })
+    // One "Drafted" row is dated before today: it moves to Old drafts, not posted.
+    expect(content).toMatchObject({ slug: 'zz-1', needsYou: 1, incomplete: false, working: null, waiting: null, nextRun: { agent: 'ZZ.1.A', run: { label: 'Tomorrow 06:00 WIB' } } })
     expect(content.agents[0]).toMatchObject({ state: 'Ran today' })
     // The lab board's Title column (AA) is not in the fake sheet: read-only, titles from nothing.
     expect(lab).toMatchObject({ needsYou: 2, working: 1, waiting: 1, incomplete: false })
@@ -152,6 +153,13 @@ describe('Claude overview', () => {
     expect(data.boards['example-lab'].needsYou).toEqual([3, 2])
     expect(data.boards['example-drafts'].cards.map((card) => card.statusKey)).toEqual(['drafted', 'drafted', 'posted', 'backup'])
     expect(data.boards['example-drafts'].files).toMatchObject({ status: 'missing' })
+    expect(data.boards['example-drafts'].needsYou).toEqual([2])
+    expect(data.boards['example-drafts'].table).toEqual({
+      columns: [{ key: 'postDate', header: 'Post date', kind: 'date' }, { key: 'topic', header: 'Topic', kind: 'title' }, { key: 'status', header: 'Status', kind: 'status' }],
+      stale: { label: 'Old drafts, not posted', rows: [3] },
+    })
+    expect(data.boards['example-drafts'].cards[0].values).toEqual({ postDate: '2026-11-09', topic: 'Example topic', status: 'Drafted' })
+    expect(data.boards['example-lab'].table).toBeUndefined()
     expect(data.teams[1].agents.map((agent) => agent.state)).toEqual(['Working', 'Notifier'])
   })
 
@@ -197,5 +205,20 @@ describe('Claude routes', () => {
     } finally {
       api.close()
     }
+  })
+})
+
+describe('table columns', () => {
+  const board = findBoard(parseClaudeConfig(exampleConfig()), 'example-drafts')!
+  const columns = [...board.columns, { key: 'slot', col: 'E', index: 4, header: 'Slot' }, { key: 'visual', col: 'F', index: 5, header: 'Visual style' }, { key: 'source', col: 'G', index: 6, header: 'Main source' }]
+  const rows = [{ row: 2, cells: { postDate: '2026-11-09', topic: 'T', status: 'Drafted', ganiNotes: '', slot: 'a', visual: 'a long description of the visual style here', source: 'https://example.com/x' } }]
+
+  it('picks date, title, status, score and the first short plain column; never long text or links', () => {
+    expect(tableColumns({ ...board, columns }, rows).map((column) => column.key)).toEqual(['postDate', 'topic', 'status', 'slot'])
+    expect(tableColumns({ ...board, columns: columns.filter((column) => column.key !== 'slot') }, rows).map((column) => column.key)).toEqual(['postDate', 'topic', 'status'])
+  })
+
+  it('uses the config\'s tableColumns when set', () => {
+    expect(tableColumns({ ...board, columns, tableColumns: ['topic', 'visual'] }, rows)).toEqual([{ key: 'topic', header: 'Topic', kind: 'title' }, { key: 'visual', header: 'Visual style', kind: 'text' }])
   })
 })

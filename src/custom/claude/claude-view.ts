@@ -56,3 +56,18 @@ export function relationLine(card: CardSummary): string {
   if (relations.unlocks.length) return `Unlocks ${relations.unlocks.slice(0, 4).join(', ')}${relations.unlocks.length > 4 ? ` +${relations.unlocks.length - 4}` : ''}`
   return ''
 }
+
+export interface SortState { column: string; direction: 'asc' | 'desc' }
+
+/** Sorts table rows by one column; numbers as numbers, empty values last. An empty column keeps the given order. */
+export function sortCards(cards: readonly CardSummary[], sort: SortState): CardSummary[] {
+  if (!sort.column) return [...cards]
+  const value = (card: CardSummary) => card.values?.[sort.column] ?? ''
+  return [...cards].sort((a, b) => {
+    const [x, y] = [value(a), value(b)]
+    if (!x || !y) return x ? -1 : y ? 1 : a.row - b.row
+    const numeric = Number.isFinite(Number(x)) && Number.isFinite(Number(y))
+    const order = numeric ? Number(x) - Number(y) : x.localeCompare(y, 'en', { numeric: true, sensitivity: 'base' })
+    return (sort.direction === 'asc' ? order : -order) || a.row - b.row
+  })
+}

@@ -63,7 +63,9 @@ export async function rowDetail(data: ClaudeData, boardId: string, rowNumber: nu
     notesLength: notes ? (row.cells[notes.key] ?? '').length : 0,
     board: { id: view.id, title: view.title, kind: view.kind, testCopy: view.testCopy, fetchedAt: view.fetchedAt, ...(view.readOnly ? { readOnly: view.readOnly } : {}), hasFiles: Boolean(root) },
     card,
-    fields: board.columns.filter((column) => !OWN_SECTION.has(column.role ?? column.key) && !OWN_SECTION.has(column.key)).map((column) => ({ key: column.key, header: column.header, value: row.cells[column.key] ?? '' })),
+    // A table board's ID column is its link or website: listed with the other fields.
+    fields: board.columns.filter((column) => (board.kind === 'table' && column.role === 'id') || (!OWN_SECTION.has(column.role ?? column.key) && !OWN_SECTION.has(column.key))).map((column) => ({ key: column.key, header: column.header, value: row.cells[column.key] ?? '' })),
+    agentNotesHeader: columnOf(board, 'agentNotes')?.header ?? 'Agent notes',
     task: cellOf(board, row, 'description'),
     agentNotes: parseAgentNotes(columnOf(board, 'agentNotes') ? cellOf(board, row, 'agentNotes') : ''),
     ownerNotes: parseOwnerNotes(cellOf(board, row, 'ganiNotes')),

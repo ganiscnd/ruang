@@ -16,7 +16,12 @@ const team = (extra: Partial<TeamSummary> = {}): TeamSummary => ({
   agents: [{ code: 'ZZ.3.B', name: 'Example builder', state: 'Waiting for you', detail: 'In review: T02', nextRun: { label: '10:00 WIB' }, runsOnMac: true, notifierOnly: false, provenance: 'from Lab board, read 09:15' }],
   ...extra,
 })
-const board = (extra: Partial<BoardView> = {}): BoardView => ({
+/** Table boards get two table columns (title, status) and their values, as the server sends them. */
+const board = (extra: Partial<BoardView> = {}): BoardView => {
+  const view = baseBoard(extra)
+  return view.kind === 'table' && !view.table ? { ...view, table: { columns: [{ key: 'title', header: 'Title', kind: 'title' }, { key: 'status', header: 'Status', kind: 'status' }] }, cards: view.cards.map((card) => ({ ...card, values: { title: card.title, status: card.status } })) } : view
+}
+const baseBoard = (extra: Partial<BoardView> = {}): BoardView => ({
   id: 'example-lab', title: 'Lab board', kind: 'taskflow', testCopy: false, fetchedAt: '2026-11-09T02:15:00.000Z', availability: 'available', needsYouRule: true, neverTouch: [],
   cards: [
     { row: 2, key: 'T01', id: 'T01', title: 'Example done task', status: 'approved', statusKey: 'approved', owner: 'ZZ.3.A' },
@@ -70,7 +75,7 @@ describe('Claude team page', () => {
     const markup = renderToStaticMarkup(<ClaudeTeamView team={ready(data([board({ kind: 'table' })]))}/>)
     expect(markup).toContain('Waiting for you')
     expect(markup).toContain('from Lab board, read 09:15')
-    expect(markup).toMatch(/Needs you.*T02.*Example review task/s)
+    expect(markup).toMatch(/Needs you.*Example review task/s)
     expect(markup).toMatch(/<details class="claude-group"><summary><span class="badge muted">approved/)
   })
 

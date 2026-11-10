@@ -94,3 +94,5 @@
 .claude-cells { display: grid; gap: 10px; }
 .claude-cells p { margin: 0; }
 .claude-cell-change span { color: var(--c-9ea79e); text-decoration: line-through; }
+.claude-sort { background: none; border: 0; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; padding: 0; text-transform: inherit; }
+.claude-sort:hover { color: var(--claude-accent); }

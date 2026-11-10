@@ -2,7 +2,8 @@
 export interface NextRun { at?: string; label: string; macOff?: boolean }
 export type AgentState = 'Working' | 'Waiting for you' | 'Queued' | 'Idle' | 'Ran today' | 'Not run yet today' | 'Paused' | 'Notifier' | 'Unknown'
 export interface AgentLine { code: string; name: string; state: AgentState; detail: string; nextRun: NextRun; runsOnMac: boolean; notifierOnly: boolean; provenance: string }
-export interface CardSummary { row: number; key: string; id?: string; title: string; status: string; statusKey: string; owner?: string; date?: string; score?: string; updated?: string; relations?: Relations }
+export interface CardSummary { row: number; key: string; id?: string; title: string; status: string; statusKey: string; owner?: string; date?: string; score?: string; updated?: string; relations?: Relations; values?: Record<string, string> }
+export interface TableColumn { key: string; header: string; kind: 'date' | 'title' | 'status' | 'score' | 'text' }
 export interface FilesHealth { status: 'readable' | 'denied' | 'missing' | 'error'; message: string }
 export interface BoardView {
   id: string
@@ -20,6 +21,7 @@ export interface BoardView {
   needsYouReason?: string
   neverTouch: number[]
   flow?: Flow
+  table?: { columns: TableColumn[]; stale?: { label: string; rows: number[] } }
 }
 export interface BoardLink { id: string; title: string; availability: 'available' | 'unavailable'; reason?: string; readOnly?: string; testCopy: boolean }
 export interface TeamSummary {
@@ -57,6 +59,7 @@ export interface RowDetail {
   board: { id: string; title: string; kind: 'taskflow' | 'table'; testCopy: boolean; fetchedAt: string; readOnly?: string; hasFiles: boolean }
   card: CardSummary
   fields: { key: string; header: string; value: string }[]
+  agentNotesHeader: string
   task: string
   agentNotes: AgentNotes
   ownerNotes: NoteBlock[]

@@ -12,7 +12,8 @@ import type { SheetsApi } from './sheets.js'
 export type AgentState = 'Working' | 'Waiting for you' | 'Queued' | 'Idle' | 'Ran today' | 'Not run yet today' | 'Paused' | 'Notifier' | 'Unknown'
 export interface AgentLine { code: string; name: string; state: AgentState; detail: string; nextRun: NextRun; runsOnMac: boolean; notifierOnly: boolean; provenance: string }
 
-export interface CardSummary { row: number; key: string; id?: string; title: string; status: string; statusKey: string; owner?: string; date?: string; score?: string; updated?: string; /** Task-flow boards only. */ relations?: Relations }
+export interface CardSummary { row: number; key: string; id?: string; title: string; status: string; statusKey: string; owner?: string; date?: string; score?: string; updated?: string; /** Task-flow boards only. */ relations?: Relations; /** Table boards: the values of the table's columns. */ values?: Record<string, string> }
+export interface TableColumn { key: string; header: string; kind: 'date' | 'title' | 'status' | 'score' | 'text' }
 export interface FilesHealth { status: 'readable' | 'denied' | 'blocked' | 'missing' | 'error'; message: string }
 export interface BoardView {
   id: string
@@ -32,6 +33,8 @@ export interface BoardView {
   needsYouReason?: string
   /** Rows in a status the owner may never change (do-not-contact). */
   neverTouch: number[]
+  /** Table boards: the columns shown, and rows that matched Needs you but are past their date. */
+  table?: { columns: TableColumn[]; stale?: { label: string; rows: number[] } }
   /** Task-flow boards: the ranked Needs-you list with reasons, agent queues, the open chain. */
   flow?: { needs: NeedsItem[]; queues: Queue[]; chain: string[]; warnings: string[] }
 }
@@ -102,12 +105,47 @@ function needsYouRows(board: BoardConfig, read: BoardRead, cards: CardSummary[])
     .map((card) => card.row)
 }
 
+/**
+ * Rows planned for a date (a post date) that has passed are no longer something to act on now
+ * (owner's rule, 2026-11-10): they leave Needs you for a collapsed "Old drafts, not posted" group.
+ * Dates are text YYYY-MM-DD on these boards; anything else stays in Needs you.
+ */
+function splitStale(board: BoardConfig, rows: number[], cards: CardSummary[], today: string | undefined): { needs: number[]; stale?: { label: string; rows: number[] } } {
+  if (board.dateColumn !== 'postDate' || !today) return { needs: rows }
+  const dateOf = new Map(cards.map((card) => [card.row, card.date ?? '']))
+  const past = (row: number) => /^\d{4}-\d{2}-\d{2}$/.test(dateOf.get(row) ?? '') && dateOf.get(row)! < today
+  return { needs: rows.filter((row) => !past(row)), stale: { label: 'Old drafts, not posted', rows: rows.filter(past) } }
+}
+
+const ROLE_KIND: Partial<Record<string, TableColumn['kind']>> = { title: 'title', status: 'status', score: 'score' }
+const SHORT_MEDIAN = 25
+const SHORT_MAX = 40
+
+/** The table's columns: the config's `tableColumns`, else date, title, status, score and the first short plain column. */
+export function tableColumns(board: BoardConfig, rows: readonly BoardRow[]): TableColumn[] {
+  const spec = (key: string) => board.columns.find((column) => column.key === key)!
+  const kind = (key: string): TableColumn['kind'] => (key === board.dateColumn ? 'date' : ROLE_KIND[spec(key).role ?? ''] ?? 'text')
+  const make = (key: string): TableColumn => ({ key, header: spec(key).header, kind: kind(key) })
+  if (board.tableColumns?.length) return board.tableColumns.map(make)
+  const byRole = (role: string) => board.columns.find((column) => column.role === role)?.key
+  const picked = [board.dateColumn, byRole('title'), byRole('status'), byRole('score')].filter((key): key is string => Boolean(key))
+  const short = board.columns.find((column) => {
+    if (column.role || picked.includes(column.key)) return false
+    const lengths = rows.map((row) => (row.cells[column.key] ?? '').length).filter(Boolean).sort((a, b) => a - b)
+    return lengths.length > 0 && lengths[Math.floor(lengths.length / 2)] <= SHORT_MEDIAN && lengths.at(-1)! <= SHORT_MAX && !rows.some((row) => /^https?:\/\//.test(row.cells[column.key] ?? ''))
+  })
+  return [...picked, ...(short ? [short.key] : [])].map(make)
+}
+
 export function boardView(read: BoardRead, files?: FilesHealth, context: { today?: string; runs?: ReadonlyMap<string, NextRun> } = {}): BoardView {
   const { board } = read
   const known = knownStatuses(board)
   const flow = board.kind === 'taskflow' && read.availability === 'available' ? computeFlow(read, { today: context.today ?? '', ...(context.runs ? { runs: context.runs } : {}) }) : undefined
   const cards = read.rows.map((row) => ({ ...cardOf(board, row, known), ...(flow?.relations[row.row] ? { relations: flow.relations[row.row] } : {}) }))
   const never = new Set(board.neverTouchStatus.map((status) => status.toLowerCase()))
+  const columns = board.kind === 'table' ? tableColumns(board, read.rows) : undefined
+  const tableCards = columns ? cards.map((card) => { const row = read.rows.find((item) => item.row === card.row)!; return { ...card, values: Object.fromEntries(columns.map((column) => [column.key, row.cells[column.key] ?? ''])) } }) : cards
+  const split = flow ? { needs: flow.needs.map((item) => item.row) } : splitStale(board, needsYouRows(board, read, cards), cards, context.today)
   return {
     id: board.id,
     title: board.title,
@@ -118,8 +156,9 @@ export function boardView(read: BoardRead, files?: FilesHealth, context: { today
     ...(read.reason ? { reason: read.reason } : {}),
     ...(read.readOnly ? { readOnly: read.readOnly } : {}),
     ...(files ? { files } : {}),
-    cards,
-    needsYou: flow ? flow.needs.map((item) => item.row) : needsYouRows(board, read, cards),
+    cards: tableCards,
+    needsYou: split.needs,
+    ...(columns ? { table: { columns, ...(split.stale?.rows.length ? { stale: split.stale } : {}) } } : {}),
     needsYouRule: Boolean(board.needsYou),
     ...(board.needsYou?.reason ? { needsYouReason: board.needsYou.reason } : {}),
     neverTouch: cards.filter((card) => never.has(card.statusKey)).map((card) => card.row),

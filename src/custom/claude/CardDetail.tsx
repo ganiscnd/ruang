@@ -5,6 +5,14 @@ import { FileViewer } from './FileViewer.tsx'
 import { NoteForm } from './NoteForm.tsx'
 import type { AgentNotes, PathStateName, RowDetail } from './types.ts'
 
+/** Longer field values fold away under their header instead of filling the grid. */
+const LONG_FIELD = 300
+
+/** A plain value, or a link when the whole value is one http(s) address. */
+function FieldValue({ value }: { value: string }) {
+  return /^https?:\/\/\S+$/i.test(value.trim()) ? <a href={value.trim()} target="_blank" rel="noreferrer noopener">{value.trim()}</a> : <>{value}</>
+}
+
 const STATE_LABEL: Partial<Record<PathStateName, string>> = { missing: 'Not found', 'not-downloaded': 'Not downloaded on the Mac yet', refused: 'Outside the output folder', error: 'Not Available' }
 
 function NotesList({ title, items }: { title: string; items: string[] }) {
@@ -60,10 +68,11 @@ export function CardDetail({ board, row, onClose, onOpenTask, onChanged, notice 
           {relations.waitsFor.length > 0 && <div><dt>Still waits for</dt><dd>{taskLinks(relations.waitsFor)}</dd></div>}
           <div><dt>Unlocks</dt><dd>{taskLinks(relations.unlocks)}</dd></div>
         </>}
-        {detail.fields.filter((field) => field.value).map((field) => <div key={field.key}><dt>{field.header}</dt><dd className="claude-field">{field.value}</dd></div>)}
+        {detail.fields.filter((field) => field.value && field.value.length <= LONG_FIELD).map((field) => <div key={field.key}><dt>{field.header}</dt><dd className="claude-field"><FieldValue value={field.value}/></dd></div>)}
       </dl>
+      {detail.fields.filter((field) => field.value.length > LONG_FIELD).map((field) => <details key={field.key} className="claude-section"><summary>{field.header} <small className="muted">({field.value.length.toLocaleString('en-US')} characters)</small></summary><p className="claude-pre">{field.value}</p></details>)}
       {detail.task && <details className="claude-section"><summary>Task</summary><p className="claude-pre">{detail.task}</p></details>}
-      <section className="claude-section"><h3>Agent notes</h3><AgentNotesView notes={detail.agentNotes}/></section>
+      <section className="claude-section"><h3>{detail.agentNotesHeader}</h3><AgentNotesView notes={detail.agentNotes}/></section>
       {detail.outputs.length > 0 && <section className="claude-section"><h3>Output files</h3>
         <ul className="claude-outputs">{detail.outputs.map((line, index) => <li key={index}>
           {line.links.length ? line.links.map((link) => <span key={link.path} className="claude-output-link">{link.state === 'file' || link.state === 'dir' || link.state === 'unknown' ? <button type="button" className="link-button" onClick={() => setFile(link.path)}>{link.state === 'dir' ? '📁' : '📄'} {link.path}</button> : <span className="text-bad">{STATE_LABEL[link.state] ?? link.state} ({link.path})</span>}</span>) : null}

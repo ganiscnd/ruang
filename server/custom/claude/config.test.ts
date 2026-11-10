@@ -47,6 +47,7 @@ describe('Claude config', () => {
     ['a files root outside the iCloud root', (config: Config) => { board(config, 0).files = { root: '../Documents' } }, /inside the iCloud root/],
     ['a bad spreadsheet id', (config: Config) => { board(config, 0).spreadsheetId = 'x/../y' }, /invalid value/],
     ['an unknown timezone', (config: Config) => { config.timezone = 'Mars/Base' }, /Unknown timezone/],
+    ['an unknown table column', (config: Config) => { board(config, 0).tableColumns = ['topic', 'nope'] }, /tableColumns names the unknown column/],
     ['a bad sortBy', (config: Config) => { board(config, 0).needsYou = { status: ['Drafted'], sortBy: 'nope up' } }, /sortBy/],
   ])('refuses %s', (_name, change, message) => {
     expect(() => parseClaudeConfig(variant(change))).toThrow(message)
