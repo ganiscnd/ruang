@@ -37,11 +37,14 @@ export function wingLayout(teams: readonly TeamShape[]): WingLayout {
   const clusters = teams.map((team): WingCluster => {
     const workers = team.agents.filter((agent) => !agent.notifierOnly)
     const notifier = team.agents.find((agent) => agent.notifierOnly)
-    const columns = Math.max(1, Math.ceil(workers.length / DESK_ROWS_Z.length)) + (notifier ? 1 : 0)
+    const perRow = Math.ceil(workers.length / DESK_ROWS_Z.length) || 1
+    // The notifier's terminal takes a free front-row slot, else one more column (front row), so it
+    // never stands next to a back-row desk where their labels would collide.
+    const freeFront = perRow * DESK_ROWS_Z.length - workers.length > 0 && workers.length > perRow
+    const columns = perRow + (notifier && !freeFront ? 1 : 0)
     const minX = x
     const maxX = x + columns * COLUMN_PITCH
     // Back row fills first, left to right, then the front row.
-    const perRow = Math.ceil(workers.length / DESK_ROWS_Z.length) || 1
     const desks = workers.map((agent, index): WingDesk => {
       const row = Math.floor(index / perRow)
       const deskX = minX + COLUMN_PITCH * (index % perRow + 0.5)
@@ -53,7 +56,7 @@ export function wingLayout(teams: readonly TeamShape[]): WingLayout {
     return {
       slug: team.slug, code: team.code, name: team.name, paused: team.status === 'paused', minX, maxX, desks,
       label: [center, 0, 0.6], board: [center, 1.55, WING_MIN_Z + 0.16],
-      ...(notifier ? { terminal: { agent: notifier.code, position: [maxX - COLUMN_PITCH / 2, 0, DESK_ROWS_Z[0]] as Vec3 } } : {}),
+      ...(notifier ? { terminal: { agent: notifier.code, position: [maxX - COLUMN_PITCH / 2, 0, DESK_ROWS_Z[1]] as Vec3 } } : {}),
     }
   })
   const desksEnd = x - CLUSTER_GAP + MARGIN
@@ -63,11 +66,13 @@ export function wingLayout(teams: readonly TeamShape[]): WingLayout {
   const spots: Placement[] = [-0.75, 0, 0.75].map((dx) => ({ position: [sofa[0] + dx, 0, sofa[2] + 0.1], facing: 0, seated: true }))
   return {
     building: { minX: WING_MIN_X, maxX, minZ: WING_MIN_Z, maxZ: WING_MAX_Z },
-    sign: [(WING_MIN_X + maxX) / 2, 2.95, WING_MIN_Z + 0.05],
+    // In front of the back wall's face (wall centre ± 0.125), or the wall hides its lower edge.
+    sign: [(WING_MIN_X + maxX) / 2, 2.95, WING_MIN_Z + 0.2],
     entranceX: WING_MIN_X + 2.4,
     clusters,
     lounge: { sofa, spots },
-    center: [(WING_MIN_X + maxX) / 2, 0.6, (WING_MIN_Z + WING_MAX_Z) / 2],
+    // Aimed behind the middle, so the back row's labels sit well below the top edge.
+    center: [(WING_MIN_X + maxX) / 2, 0.6, (WING_MIN_Z + WING_MAX_Z) / 2 - 1.2],
   }
 }
 
@@ -82,6 +87,9 @@ export function wingPlacement(state: AgentState, desk: WingDesk, layout: WingLay
   const extra = Math.floor(idleIndex / layout.lounge.spots.length)
   return extra ? { position: [spot.position[0], 0, spot.position[2] + 0.9 * extra], facing: 0, seated: false, at: 'lounge' } : { ...spot, at: 'lounge' }
 }
+
+/** States worth a speech bubble in 3D; the rest show only their badge (the caption stays in the tooltip). */
+export const BUBBLE_STATES: ReadonlySet<AgentState> = new Set(['Working', 'Waiting for you', 'Queued'])
 
 /** One line under an agent's name: what the board says, never more. */
 export function wingCaption(agent: Pick<AgentLine, 'state' | 'nextRun' | 'detail'>): string {

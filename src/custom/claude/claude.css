@@ -108,3 +108,4 @@
 .claude-wing-agent { align-items: center; background: transparent; border: 1px solid var(--c-313831); border-radius: 4px; color: inherit; cursor: pointer; display: grid; font: inherit; gap: 2px 8px; grid-template-columns: auto 1fr; padding: 6px 8px; text-align: left; }
 .claude-wing-agent small { grid-column: 1 / -1; }
 .claude-wing-agent:hover, .claude-wing-agent:focus-visible { border-color: var(--claude-accent); }
+.claude-speech { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }

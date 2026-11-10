@@ -31,6 +31,11 @@ describe('Claude wing layout', () => {
     expect(layout.clusters.map((cluster) => cluster.desks.length)).toEqual([2, 3, 5])
     expect(layout.clusters[2].terminal?.agent).toBe('ZZ.3.0')
     expect(layout.clusters[2].desks.some((desk) => desk.agent === 'ZZ.3.0')).toBe(false)
+    // The terminal takes ZZ.3's free front-row slot: no extra column, never beside a back-row desk.
+    const terminal = layout.clusters[2].terminal!.position
+    expect(terminal[2]).toBe(-1.0)
+    expect(layout.clusters[2].desks.some((desk) => desk.desk[0] === terminal[0] && desk.desk[2] === terminal[2])).toBe(false)
+    expect(layout.clusters[2].maxX - layout.clusters[2].minX).toBeCloseTo(3 * 2.3)
     const positions = layout.clusters.flatMap((cluster) => cluster.desks.map((desk) => desk.desk.join(',')))
     expect(new Set(positions).size).toBe(positions.length)
     // Seats are in front of their desk, facing the camera.
