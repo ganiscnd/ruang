@@ -205,6 +205,59 @@ Write rules (never weaken):
 - Hermes has no token cap; the caps are turns, time and one attempt. Measure real use with
   `hermes -p <profile> insights --days 1`.
 
+### Feature: Claude Teams (`#/claude`, built 2026-11-09/10)
+
+Teams of Claude scheduled tasks (agent codes `ZZ.<team>.<agent>`) that coordinate through Google
+Sheets. The sheets stay the source of truth; Ruang reads them and writes only the owner's comments
+and status. Brief: `docs/plans/feature-claude-teams.md`; report: `docs/reports/05-claude-teams.md`.
+
+Private config (never in the repo): `~/freelance-private/ruang-claude/teams.json`
+(`RUANG_CLAUDE_CONFIG` overrides) with teams, agents and schedules, boards (spreadsheet ID, tab,
+column letters **with header text**, roles, `rowKey`, `needsYou`, `ganiCanSetStatus`,
+`writableColumns`, `neverTouchStatus`, optional `tableColumns`, `files.root`), `testBoards`
+(copies, `testCopyOf`), `ownerName`, `liveWrites`, `icloudRoot`, and the service account key file
+(`google-service-account.json`, chmod 600; shared Editor on each spreadsheet).
+
+| File (`server/custom/claude/`) | What it does |
+| --- | --- |
+| `config.ts` | Strict loader; test copies inherit their live board's settings. |
+| `sheets.ts` | Sheets REST client: service-account JWT signed with `node:crypto` (no Google packages), `batchGet`, `batchUpdate` (RAW). Errors never carry the key, token or account address. |
+| `board.ts` | Reads a board (20 s limit), checks every header in row 1 (mismatch → column blanked, board read-only), status keys (known statuses whole, free text by first word, case-insensitive), titles. |
+| `teams.ts` | One cached read (30 s) of every board → overview, board views, agent lines. Agent state only from rows: task flow by own rows; table-board agents "Ran today" / "Not run yet today"; paused team Paused; unreadable board Unknown. Table columns; Drafts' past post dates → "Old drafts, not posted". |
+| `taskflow.ts` | Task-flow boards: Needs-you order (unblocked now → all downstream → idle-agent tie-breaker → review > proposed > blocked → ID) with one-line reasons, agent queues, critical chain, warnings, stuck. |
+| `schedule.ts` | Next run from the config's schedule forms, Asia/Jakarta; flags Mac runs outside 05:30-22:55. |
+| `notes.ts` | Agent notes (`Done:/Check:/Questions:`, older paragraphs as sentence bullets), owner-notes history (dated headings), output lines → paths. |
+| `probe.ts`, `files.ts` | Every iCloud file-system call runs in a short-lived child process with a time limit (macOS can hold iCloud reads indefinitely). Output viewer: real-path containment, no hidden files, size caps, redaction, images/PDF inline, `.docx/.xlsx` downloads, never HTML/SVG. |
+| `actions.ts` | **The Sheets write allowlist** (`claude.note`, `claude.status`); see the write rule above. |
+| `routes.ts` | `GET /api/custom/claude/teams[/:team]`, `/boards/:board/rows/:row`, `/files`, `/raw`; `POST /api/custom/claude/actions/{preview,execute}`; 30 s last-resort deadline per read. |
+| `access-check.ts` | Read-only setup check (`node build/server/custom/claude/access-check.js`): counts and value shapes only. |
+
+UI (`src/custom/claude/`): `ClaudeNav.tsx` (sidebar group), `pages/Claude*.tsx` (overview, team
+page), `TaskflowBoard.tsx`, `TableBoard.tsx`, `CardDetail.tsx`, `NoteForm.tsx` (+ confirmation),
+`FileViewer.tsx`, `mini-markdown.tsx` (React elements only, never HTML strings), `wing-layout.ts`,
+`scene3d/ClaudeWing3D.tsx`, `scene3d/ClaudeWingLabels.tsx`, `ClaudeWing2D.tsx`,
+`use-claude-overview.ts`. Test fixtures are invented (`example.fixture.ts`, not built).
+
+Upstream hooks (marked `custom:`): `src/routes.ts` (`Claude` page, `hermesNavigation`),
+`src/App.tsx` (Hermes/Claude sidebar groups, `#/claude/<team>` links), `src/pages/Office.tsx`
+(overview poll, "Claude wing" 2D tab), `src/pages/Office3D.tsx` (wing, labels, pan area, "Claude
+wing" camera button), `server/custom/routes.ts` (`installClaude`), `server/custom/guard.ts`
+(shared write guards), `server/mission-control.ts` (`recordCommand` export),
+`tsconfig.server.build.json` (`*.fixture.ts` not built), `api-version.ts` (14).
+
+Rules for this feature:
+- Never show a count or state the sheet does not prove; unreadable → "Not Available: <reason>".
+- No spreadsheet IDs, task IDs, titles, file names, note text or the owner's name in the repo,
+  tests or reports (code and tests use "Owner").
+- Writes to the live boards only with `"liveWrites": true` (set by the owner 2026-11-10); new write
+  tests go to a test copy.
+- macOS privacy treats a server started from the terminal differently from the LaunchAgent's
+  `node` (which has Full Disk Access since 2026-11-09). Check iCloud behaviour with a temporary
+  launchd job on port 3002 (own label, isolated `RUANG_CONFIG_DIR`), removed afterwards.
+- Visual checks: Google Chrome is not installed (its installer needs sudo). Use Playwright's own
+  Chromium from a scratch folder (`npx playwright install chromium`, user cache, no sudo) with
+  `--use-angle=swiftshader` for the 3D view, against a port-3002 test server.
+
 ### Testing writes safely
 
 Use port 3002 and an isolated config folder with a throwaway access code, so the real
